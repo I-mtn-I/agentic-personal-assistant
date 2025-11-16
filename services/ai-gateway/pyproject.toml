@@ -1,0 +1,22 @@
+[project]
+name = "perosnalassistant"
+version = "0.1.0"
+description = "AI powered personal assistant project"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "caldav>=2.1.2",
+    "duckduckgo-search>=6.4.2",
+    "langchain>=1.0.5",
+    "langchain-classic>=1.0.0",
+    "langchain-ollama>=1.0.0",
+    "langchain-qdrant>=1.1.0",
+    "langgraph>=1.0.3",
+    "llama-index>=0.14.8",
+    "llama-index-embeddings-ollama>=0.8.4",
+    "llama-index-llms-ollama>=0.9.0",
+    "llama-index-llms-openai>=0.6.8",
+    "llama-index-tools-duckduckgo>=0.4.1",
+    "pydantic-settings>=2.12.0",
+    "qdrant-client>=1.15.1",
+]

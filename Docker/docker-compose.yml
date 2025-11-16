@@ -1,0 +1,153 @@
+services:
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    networks:
+      - agentic
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+
+  postgre:
+    image: postgres:alpine
+    restart: unless-stopped
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    expose:
+      - 5432
+    environment:
+      - POSTGRES_INITDB_ARGS=--locale=en_US.UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    networks:
+      - agentic
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: always
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    expose:
+      - 6333
+      - 6334
+      - 6335
+    networks:
+      - agentic
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+  # Optional - if you want to keep everything up-to-date
+  watchtower:
+    image: nickfedor/watchtower
+    container_name: watchtower
+    restart: always
+    environment:
+      WATCHTOWER_SCHEDULE: "0 0 22 * * *"
+      TZ: "Asia/Singapore"
+      WATCHTOWER_CLEANUP: true
+      WATCHTOWER_DEBUG: true
+      WATCHTOWER_UPDATE_ON_START: true
+      WATCHTOWER_INCLUDE_STOPPED: true
+    networks:
+      - agentic
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  # TODO:
+  # nettu:
+  #   image: fmeringdal/nettu-scheduler:0.6.0
+  #   environment:
+  #     - DATABASE_URL=value
+  #   entrypoint:
+  #     - "integrations/wait-for.sh"
+  #     - "postgres:5432"
+  #     - "--"
+  # keycloak:
+  #   image: quay.io/keycloak/keycloak:24.0
+  #   environment:
+  #     KC_HOSTNAME: localhost
+  #     KC_HOSTNAME_PORT: 7080
+  #     KC_HOSTNAME_STRICT_BACKCHANNEL: "true"
+  #     KEYCLOAK_ADMIN: admin
+  #     KEYCLOAK_ADMIN_PASSWORD: admin
+  #     KC_HEALTH_ENABLED: "true"
+  #     KC_LOG_LEVEL: info
+  #   healthcheck:
+  #     test: [ "CMD", "curl", "-f", "http://localhost:7080/health/ready" ]
+  #     interval: 15s
+  #     timeout: 2s
+  #     retries: 15
+  #   command: [ "start-dev", "--http-port", "7080", "--https-port", "7443" ]
+  #   ports:
+  #     - "7080:7080"
+  #     - "7443:7443"
+  #   networks:
+  #     - agentic
+  # traefik:
+  #   image: "traefik"
+  #   restart: always
+  #   command:
+  #     - "--api.insecure=false"
+  #     - "--providers.docker=true"
+  #     - "--providers.docker.exposedbydefault=false"
+  #     - "--entrypoints.web.address=:80"
+  #     - "--entrypoints.websecure.address=:443"
+  #     - "--entrypoints.websecure.http.tls=true"
+  #     - "--log.level=INFO"
+  #     - "--providers.file.filename=/etc/traefik/dynamic.yaml"
+  #   ports:
+  #     - "443:443"
+  #   volumes:
+  #     - ./certs:/certs:ro
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #     - ./traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
+  #   networks:
+  #     - agentic
+
+
+  # ensure these paths are available or change accordingly
+volumes:
+  ollama_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /mnt/storage/ollama-data
+      o: bind
+  postgres-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /mnt/storage/postgres-data
+      o: bind
+  qdrant-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /mnt/storage/qdrant-data
+      o: bind
+
+networks:
+  agentic:
+    external: true
+    name: llmnetwork

@@ -7,7 +7,8 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
+.venv/
+services/.venv/
 list/
 .env
 
@@ -16,3 +17,6 @@ list/
 
 # OS
 .DS_Store
+
+# Docker volumes
+.docker-volumes/

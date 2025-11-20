@@ -1,6 +1,7 @@
 import random
-from domain.agent_factory import create_lc_agent
-from domain.tool_factory import create_lc_tool
+
+from ai_gateway.domain.agent_factory import create_lc_agent
+from ai_gateway.domain.tool_factory import create_lc_tool
 
 
 def generate_hilton_guest_password():
@@ -10,7 +11,7 @@ def generate_hilton_guest_password():
 
 def main():
     tool = create_lc_tool(
-        callable=generate_hilton_guest_password, description="Wifi Password Generator"
+        target=generate_hilton_guest_password, description="Wifi Password Generator"
     )
     agent = create_lc_agent("helpdesk", overrides={"tools": [tool]})
     question = "What is the Wi‑Fi password for guests?"

@@ -1,39 +1,32 @@
-import logging
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-import yaml
-from typing import Dict, Optional, Iterator, Any, Mapping
-from pydantic import BaseModel, ValidationError
-from pydantic_settings import BaseSettings
-from types import SimpleNamespace
+from typing import Any, Dict, Iterator, Mapping, Optional, cast
 
-import ollama
-from llama_index.embeddings.ollama import OllamaEmbedding
+import yaml
+from dotenv import load_dotenv
 from llama_index.core import Settings
+from llama_index.embeddings.ollama import OllamaEmbedding
+from pydantic import BaseModel, ValidationError
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 DEFAULT_AGENTS_PATH = PACKAGE_DIR / "agents.yaml"
-AGENTS_CONFIG_PATH = Path(
-    os.getenv("AGENTS_CONFIG_PATH", DEFAULT_AGENTS_PATH)
-).resolve()
+AGENTS_CONFIG_PATH = Path(os.getenv("AGENTS_CONFIG_PATH", DEFAULT_AGENTS_PATH)).resolve()
 
 ENV_PATH = PACKAGE_DIR.parents[1] / ".env"
 
 
 class AppConfig(BaseSettings):
-    PG_HOST: str
-    PG_PORT: int
-    PG_DB: str
-    PG_USER: str
-    PG_PASSWORD: str
+    POSTGRES_HOST: str
+    POSTGRES_PORT: int
+    POSTGRES_DB: str
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
     LLM_HOST: str
     LLM_MODEL: str
     LLM_EMBED_MODEL: str
 
-    class Config:
-        env_file = str(ENV_PATH)
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(env_file=str(ENV_PATH), env_file_encoding="utf-8")
 
 
 class BaseAgent(BaseModel):
@@ -46,7 +39,7 @@ class BaseAgentConfig(BaseModel):
     prompt: str
 
 
-class AgentConfigNamespace(Mapping):
+class AgentConfigNamespace(Mapping[str, BaseAgentConfig]):
     """
     Wraps a dict[str, BaseAgentConfig] to provide both mapping and attribute access.
     Usage: AGENTS_CONFIG['name'] or AGENTS_CONFIG.name
@@ -100,9 +93,10 @@ def load_agents() -> Dict[str, BaseAgentConfig]:
     if not isinstance(raw, dict):
         raise ValueError("YAML root must be a mapping of agent-name -> config")
 
+    raw_data = cast(Dict[str, Any], raw)
     configs: Dict[str, BaseAgentConfig] = {}
-    errors = {}
-    for name, cfg in raw.items():
+    errors: Dict[str, ValidationError] = {}
+    for name, cfg in raw_data.items():
         try:
             configs[name] = BaseAgentConfig.model_validate(cfg)
         except ValidationError as e:
@@ -118,7 +112,7 @@ def load_agents() -> Dict[str, BaseAgentConfig]:
 def load_env(load_dotenv_file: bool = True) -> AppConfig:
     if load_dotenv_file and ENV_PATH.exists():
         load_dotenv(dotenv_path=ENV_PATH)
-    config = AppConfig()
+    config = AppConfig()  # pyright: ignore[reportCallIssue]
     _init_llama_embeddings(config)
     return config
 

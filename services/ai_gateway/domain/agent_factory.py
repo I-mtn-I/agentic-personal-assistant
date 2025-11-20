@@ -1,9 +1,11 @@
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional
+
 from langchain.agents import create_agent as lc_create_agent
 from langchain_ollama import ChatOllama
 from langgraph.graph.state import CompiledStateGraph
-from config import AGENTS_CONFIG, APP_CONFIG
 from pydantic import BaseModel, Field
+
+from ai_gateway.config import AGENTS_CONFIG, APP_CONFIG
 
 
 class LCAgentModel(BaseModel):

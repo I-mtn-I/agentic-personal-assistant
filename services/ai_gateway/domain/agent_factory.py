@@ -62,9 +62,7 @@ def create_lc_agent(
 
     base_agent_cfg = AGENTS_CONFIG[agent_name]
 
-    cfg_dict = (
-        dict(base_agent_cfg) if not isinstance(base_agent_cfg, dict) else base_agent_cfg
-    )
+    cfg_dict = dict(base_agent_cfg) if not isinstance(base_agent_cfg, dict) else base_agent_cfg
     base_agent = LCAgentModel(**cfg_dict)
 
     lc_cfg = base_agent.model_copy(update=dict(overrides)) if overrides else base_agent

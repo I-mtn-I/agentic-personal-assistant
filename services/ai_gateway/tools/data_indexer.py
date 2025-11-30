@@ -2,7 +2,7 @@ import qdrant_client
 from llama_index.core import SimpleDirectoryReader, StorageContext, VectorStoreIndex
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
-from ai_gateway.domain.tool_factory import create_lc_tool
+from ai_gateway.domain import Tool
 
 # Load documents from folder
 # TODO: hardcoded for now. We can get attachments from the UI in the future
@@ -22,14 +22,14 @@ index = VectorStoreIndex.from_documents(
 )
 
 # Create a query engine from the index - llamaindex FTW!
-query_engine = index.as_query_engine()
+query_engine = index.as_query_engine()  # pyright: ignore
 
 
 async def query_vector_db(query: str):
     return await query_engine.aquery(query)
 
 
-vector_query_tool = create_lc_tool(
+vector_query_tool = Tool(
     target=query_vector_db,
     description="RAG tool for querying vector DB. Pass the question as an argument to this tool.",
-)
+).create_tool()

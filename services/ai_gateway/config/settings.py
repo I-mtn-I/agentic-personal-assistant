@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, Dict, Iterator, Mapping, Optional, cast
+from typing import Any, Callable, Dict, Iterator, cast
 
 import yaml
 from dotenv import load_dotenv
@@ -12,7 +12,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 PACKAGE_DIR = Path(__file__).resolve().parent
 DEFAULT_AGENTS_PATH = PACKAGE_DIR / "agents.yaml"
 AGENTS_CONFIG_PATH = Path(os.getenv("AGENTS_CONFIG_PATH", DEFAULT_AGENTS_PATH)).resolve()
-
 ENV_PATH = PACKAGE_DIR.parents[1] / ".env"
 
 
@@ -29,55 +28,71 @@ class AppConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(ENV_PATH), env_file_encoding="utf-8")
 
 
-class BaseAgent(BaseModel):
-    streaming: Optional[bool] = False
-    prompt: Optional[str] = None
-
-
 class BaseAgentConfig(BaseModel):
     streaming: bool
     prompt: str
 
 
-class AgentConfigNamespace(Mapping[str, BaseAgentConfig]):
+class AgentConfigNamespace:
     """
-    Wraps a dict[str, BaseAgentConfig] to provide both mapping and attribute access.
-    Usage: AGENTS_CONFIG['name'] or AGENTS_CONFIG.name
+    Holds a dict of objects (either raw configs or built Agent instances) and
+    exposes them **only** via attribute access:
+
+        ns.helpdesk
+        ns.it
+
+    The underlying dict can still be inspected with the helper methods below.
     """
 
-    def __init__(self, data: Dict[str, BaseAgentConfig]):
-        self._data = dict(data)
+    def __init__(
+        self,
+        data: Dict[str, Any],
+        builder: Callable[[str, Any], Any] | None = None,
+    ) -> None:
+        """
+        :param data:    mapping name → raw object (e.g. BaseAgentConfig)
+        :param builder: optional callable that receives (name, raw_obj) and
+                        returns the final object to expose.  If ``None`` the
+                        raw object is used unchanged.
+        """
+        self._raw: Dict[str, Any] = dict(data)
+        self._builder = builder
+        self._cache: Dict[str, Any] = {}  # stores built objects
 
-    # Mapping protocol
-    def __getitem__(self, key: str) -> BaseAgentConfig:
-        return self._data[key]
+    # ------------------------------------------------------------------
+    # Attribute‑only access
+    # ------------------------------------------------------------------
+    def __getattr__(self, name: str) -> Any:
+        if name not in self._raw:
+            raise AttributeError(f"No such agent: {name}")
 
+        # Build once and cache
+        if name not in self._cache:
+            if self._builder:
+                self._cache[name] = self._builder(name, self._raw[name])
+            else:
+                self._cache[name] = self._raw[name]
+        return self._cache[name]
+
+    # ------------------------------------------------------------------
+    # Small utility helpers (still attribute‑only)
+    # ------------------------------------------------------------------
+    def list_names(self) -> list[str]:
+        """Return all defined names."""
+        return list(self._raw.keys())
+
+    def raw(self, name: str) -> Any:
+        """Access the underlying raw object without building."""
+        return self._raw[name]
+
+    # ------------------------------------------------------------------
+    # Optional: make the object iterable if you ever need it
+    # ------------------------------------------------------------------
     def __iter__(self) -> Iterator[str]:
-        return iter(self._data)
+        return iter(self._raw)
 
     def __len__(self) -> int:
-        return len(self._data)
-
-    def __contains__(self, key: object) -> bool:
-        return key in self._data
-
-    # attribute access
-    def __getattr__(self, name: str) -> Any:
-        if name in self._data:
-            return self._data[name]
-        raise AttributeError(f"No such agent: {name}")
-
-    def as_dict(self) -> Dict[str, BaseAgentConfig]:
-        return dict(self._data)
-
-    def keys(self):
-        return self._data.keys()
-
-    def values(self):
-        return self._data.values()
-
-    def items(self):
-        return self._data.items()
+        return len(self._raw)
 
 
 def load_agents() -> Dict[str, BaseAgentConfig]:

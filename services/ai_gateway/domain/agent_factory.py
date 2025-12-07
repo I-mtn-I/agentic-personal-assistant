@@ -1,21 +1,77 @@
-from typing import Any, Dict
+# factory.py
+import importlib
+from typing import Callable, Dict, List
 
-from ai_gateway.config.settings import AGENTS_CONFIG, AgentConfigNamespace
+from langchain_core.tools import BaseTool
+
+from ai_gateway.config.settings import (
+    AGENTS_CONFIG,
+    TOOLS_CONFIG,
+    AgentConfigNamespace,
+    BaseAgentConfig,
+    ToolConfigNamespace,
+)
 from ai_gateway.domain.agent import Agent
+from ai_gateway.domain.tool import create_tool_from_callable
 
-# import all the tools from ai_gateway.tools module
-# update yaml to have tools property
-# values should match the exported tool names from tools module
+
+class ToolFactory:
+    """
+    Factory class to build concrete LangChain tools.
+    """
+
+    @staticmethod
+    def _resolve_tool_callable(name: str) -> Callable:
+        tools_pkg = importlib.import_module("ai_gateway.toolbox")
+        try:
+            return getattr(tools_pkg, name)
+        except AttributeError as exc:
+            raise AttributeError(f"Tool callable '{name}' not found in the tools package") from exc
+
+    @staticmethod
+    def _build_tool(target: Callable, description: str) -> BaseTool:
+        """Instantiate a concrete LangChain ``BaseTool``."""
+        return create_tool_from_callable(target=target, description=description)
+
+    @staticmethod
+    def get_default_tools() -> ToolConfigNamespace:
+        """Build every tool defined in ``TOOLS_CONFIG``."""
+        tools_dict: Dict[str, BaseTool] = {}
+        for name, cfg in TOOLS_CONFIG._raw.items():
+            # ``cfg`` is a BaseToolConfig (target is a string)
+            callable_obj = ToolFactory._resolve_tool_callable(cfg.target)  # pyright: ignore
+            tools_dict[name] = ToolFactory._build_tool(  # pyright: ignore
+                target=callable_obj, description=cfg.description
+            )
+        return ToolConfigNamespace(tools_dict)
+
+    @staticmethod
+    def get_tool_by_name(name: str) -> BaseTool:
+        """Fetch a single already‑built tool by its config key."""
+        return ToolFactory.get_default_tools()._raw[name]
 
 
 class AgentFactory:
+    """
+    Factory class to build concrete LangChain Agents
+    """
+
     @staticmethod
-    def _build_agent(name: str, cfg: Any) -> Agent:
-        """Create the concrete Agent instance from a BaseAgentConfig."""
+    def _build_agent(name: str, cfg: BaseAgentConfig) -> Agent:
+        """
+        Create an ``Agent`` instance and attach the tools listed in the
+        agent’s config (if any) by resolving them from toolbox package.
+        """
+        tool_objs: List[BaseTool] = []
+        if cfg.tools:
+            for tool_name in cfg.tools:
+                # ``tool_name`` refers to the key in tools.yaml
+                tool_objs.append(ToolFactory.get_tool_by_name(tool_name))
+
         return Agent(
             name=name,
             prompt=cfg.prompt,
-            tools=[],
+            tools=tool_objs,
             middleware=[],
             state_schema=None,
             context_schema={},
@@ -23,16 +79,9 @@ class AgentFactory:
         ).create_agent()
 
     @staticmethod
-    def get_default_agents() -> AgentConfigNamespace:
-        """
-        Build all agents defined in ``AGENTS_CONFIG`` and return them wrapped
-        in an attribute‑only ``AgentConfigNamespace``.
-        """
-        agents_dict: Dict[str, Any] = {}
-
+    def generate_default_agents() -> AgentConfigNamespace:
+        """Build all agents defined in ``AGENTS_CONFIG``."""
+        agents_dict: Dict[str, Agent] = {}
         for agent_name, agent_cfg in AGENTS_CONFIG._raw.items():
-            print("agent_name: ", agent_name)
-            print("agent_config:", agent_cfg)
             agents_dict[agent_name] = AgentFactory._build_agent(agent_name, agent_cfg)
-
         return AgentConfigNamespace(agents_dict)

@@ -1,7 +1,6 @@
 import random
 
-from ai_gateway.domain import Tool
-from ai_gateway.domain.agent_factory import AgentFactory
+from ai_gateway.domain import AgentFactory
 
 
 def generate_hilton_guest_password():
@@ -12,9 +11,9 @@ def generate_hilton_guest_password():
 def main():
     # Option A: Multi Agent Pattern with supervisor agent using sub-agent as tool
     ## 1) Create a tool using Python Callable
-    tool_wifi_pass = Tool(
-        description="Wifi Password Generator", target=generate_hilton_guest_password
-    ).create_tool()
+    # tool_wifi_pass = create_tool_from_callable(
+    #     target=generate_hilton_guest_password, description="Wifi Password Generator"
+    # )
 
     # ## 2) Create an Agent and provide the tool to it
     # it_agent = Agent(
@@ -36,12 +35,11 @@ def main():
     # print(response)
 
     # Option B: Same Multi Agent Pattern using pre-configured agents
-    default_agents = AgentFactory.get_default_agents()
-    agent_it = default_agents.it
-    agent_it.bind_tools(tool_wifi_pass)
-
-    supervisor_agent = default_agents.reception_supervisor
-    supervisor_agent.bind_tools(agent_it.get_agent_as_tool())
+    default_agents = AgentFactory.generate_default_agents()
+    supervisor_agent = default_agents.reception_supervisor.extend_agent_with_subagent(
+        default_agents.it,
+        "Useful to get it related answers such as wifi password",
+    )
     response = supervisor_agent.ask("I'm at room 451, What is the Wi-Fi password?")
     print(response)
 

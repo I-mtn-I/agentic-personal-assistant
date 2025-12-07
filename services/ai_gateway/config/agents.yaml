@@ -1,9 +1,8 @@
 # Agent Configs
 # Template:
 # <agent_name>:
-#   name: <CamelCaseName>
-#   description: "<Short description>"
 #   streaming: <Boolean>
+#   tools: <list of tool names - should match tools.yaml>
 #   prompt: >
 #     You are a ...
 #     Your job is to ...
@@ -42,7 +41,9 @@ reception_supervisor:
   prompt: >
     You are the supervisor at the frontdesk of Hotel Hilton.
     You are responsible of all reception operations.
+
 it:
   streaming: False
+  tools: [generate_wifi_pass]
   prompt: >
     You are an IT specialist of the Hilton Hotel supporting front desk.

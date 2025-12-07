@@ -10,6 +10,26 @@ from ai_gateway.config import APP_CONFIG
 
 
 class Agent:
+    """
+    Represents an agent initialized with a name, prompt, tools, and other langchain agent options.
+    Provides methods to create the agent, send queries, use as a tool, and extend with sub-agents.
+
+    :param name: The name of the agent.
+    :type name: str
+    :param prompt: The initial prompt for the agent.
+    :type prompt: str
+    :param tools: A list of tools available to the agent. Defaults to an empty list.
+    :type tools: Optional[list[Any]]
+    :param middleware: Middleware configurations for the agent. Defaults to None.
+    :type middleware: Optional[list[Any]]
+    :param state_schema: Schema for the agent's state. Defaults to None.
+    :type state_schema: Optional[Any]
+    :param context_schema: Schema for the agent's context. Defaults to an empty dictionary.
+    :type context_schema: Optional[Dict[str, Any]]
+    :param checkpointer: Checkpointing mechanism for the agent. Defaults to None.
+    :type checkpointer: Optional[Any]
+    """
+
     def __init__(
         self,
         name: str,
@@ -44,6 +64,7 @@ class Agent:
             "state_schema": self.state_schema,
             "context_schema": self.context_schema,
             "checkpointer": self.checkpointer,
+            # "debug": True,
         }
         self.agent = lc_agent(**agent_kwargs)
 
@@ -66,9 +87,10 @@ class Agent:
         # ``response`` follows the LangGraph schema; the last message holds the answer.
         return response["messages"][-1].content
 
-    def get_agent_as_tool(self) -> BaseTool:
+    def get_agent_as_tool(self, description: str) -> BaseTool:
         """
         Use the agent as a tool for another agent, making this a subagent.
+        :param description: Description of the tool for agent to understand what it does.
         """
         if self.agent is None:
             raise ValueError("No agent found, did you forget to call create_agent()?")
@@ -90,6 +112,28 @@ class Agent:
                 )
 
         agent_tool.name = f"{self.name}_tool"
-        agent_tool.description = f"Delegate tasks to the {self.name} agent. {self.prompt}"
+        agent_tool.description = f"{description}"
 
         return agent_tool
+
+    def extend_agent_with_subagent(self, sub_agent: "Agent", description: str) -> "Agent":
+        """
+        Extend an existing agent with a sub-agent.
+        Provided sub agent will be converted as a tool and added to the root agent.
+        :param root_agent: The agent to extend.
+        :param sub_agent: The agent to add as a tool.
+        :param description: Description of the tool for agent to understand what it does.
+        :return: Extended agent.
+        """
+        tool = sub_agent.get_agent_as_tool(description)
+        original_tools = self.tools.copy()
+        new_toolset = original_tools + [tool]
+        return Agent(
+            name=self.name,
+            prompt=self.prompt,
+            tools=new_toolset,
+            middleware=None,
+            state_schema=None,
+            context_schema={},
+            checkpointer=None,
+        ).create_agent()

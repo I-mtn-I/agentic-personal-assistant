@@ -4,7 +4,6 @@ from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.llms.ollama import Ollama
 
 from ai_gateway.config import APP_CONFIG
-from ai_gateway.domain import Tool
 
 pg_db = SQLDatabase.from_uri(  # pyright: ignore
     (
@@ -29,11 +28,5 @@ engine = NLSQLTableQueryEngine(
 )
 
 
-async def get_data(query_str: str):
+async def query_pgdb(query_str: str):
     return await engine.aquery(query_str)
-
-
-pg_query_tool = Tool(
-    target=get_data,
-    description="Query the sales database for analytics questions",
-).create_tool()

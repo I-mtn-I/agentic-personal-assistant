@@ -1,0 +1,13 @@
+# Tool Configs
+
+query_pgdb:
+  target: query_pgdb
+  description: Useful to query database with natural language
+
+search_web:
+  target: search_web
+  description: Useful perform a web search
+
+generate_wifi_pass:
+  target: generate_wifi_pass
+  description: Useful to generate wifi password for the guests

@@ -1,13 +1,20 @@
 # Agentic Personal Assistant Team
 
+> [!WARNING]
+> The personal assistance features are not ready
+> Project is under heavy development. This means:
+> - docs are high likely to be outdated.
+> - There's no guarantee of stability.
+
+
 A fully local, privacy focused, team of ai agents for personal assistance.
 This monorepo project aims to handle below tasks at a high level:
 
 - Schedule events, tasks and appointments upon user request (just like calendar) while handling conflicts
 - Allows grouping tasks in multiple categories: work, chores, appointments, specialdays...
 - Use Eisenhower Matrix technique to prioritize tasks
-- Learn from previous interactions to improve in time
-- TTS and STT with client-server architecure
+- Learn from previous interactions to improve over time
+- TTS and STT with client-server architecture
 - Integration with other calendars: ical, outlook, etc...
 
 ## Tech Stack
@@ -18,10 +25,10 @@ Project is leveraging following apps and frameworks:
 - LangChain: agent orchestration
 - LlamaIndex: tools, RAG and embeddings
 - AI SDK: front-end
-- Keycloak ?: for user management
+- Keycloak: for user management
 - FastAPI: middleware
 - Qdrant: vector store
-- [Nettu](https://github.com/fmeringdal/nettu-scheduler): self-hosted calndar and scheduler server with rest api
+- [Nettu](https://github.com/fmeringdal/nettu-scheduler): self-hosted calendar and scheduler server with rest api
 
 ## Project Structure
 
@@ -56,7 +63,6 @@ Front-end assets (TODO: AI-SDK implementation)
 
 1. Copy environment files:
 ```bash
-cp Docker/example.env Docker/.env
 cp services/example.env services/.env
 ```
 

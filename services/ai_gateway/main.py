@@ -1,3 +1,4 @@
+import asyncio
 import random
 
 from ai_gateway.domain import AgentFactory
@@ -18,7 +19,7 @@ def main():
     # ## 2) Create an Agent and provide the tool to it
     # it_agent = Agent(
     #     "it",
-    #     "You are an IT specialist of the Hilton Hotel supporting front desk.",
+    #     "You are an IT specialist of the Hilton 'H'otel supporting front desk.",
     #     tools=[tool_wifi_pass],
     # ).create_agent()
 
@@ -31,16 +32,25 @@ def main():
     # ).create_agent()
 
     # ## 4) invoke the supervisor agent
-    # response = supervisor_agent.ask("I'm at room 451, What is the Wi-Fi password?")
+    # response = asyncio.run(supervisor_agent.ask("I'm at room 451, What is the Wi-Fi password?"))
     # print(response)
 
     # Option B: Same Multi Agent Pattern using pre-configured agents
+    # default_agents = AgentFactory.generate_default_agents()
+    # supervisor_agent = default_agents.reception_supervisor.extend_agent_with_subagent(
+    #     default_agents.it,
+    #     "Useful to get it related answers such as wifi password",
+    # )
+    # response = asyncio.run(supervisor_agent.ask("I'm at room 451, What is the Wi-Fi password?"))
+    # print(response)
+
+    # TEST AREA:
     default_agents = AgentFactory.generate_default_agents()
-    supervisor_agent = default_agents.reception_supervisor.extend_agent_with_subagent(
-        default_agents.it,
-        "Useful to get it related answers such as wifi password",
+    response = asyncio.run(
+        default_agents.researcher.ask(
+            "What are the recent developments in Asia that are related to climate change?"
+        )
     )
-    response = supervisor_agent.ask("I'm at room 451, What is the Wi-Fi password?")
     print(response)
 
 

@@ -1,6 +1,6 @@
 # factory.py
 import importlib
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional
 
 from langchain_core.tools import BaseTool
 
@@ -29,7 +29,7 @@ class ToolFactory:
             raise AttributeError(f"Tool callable '{name}' not found in the tools package") from exc
 
     @staticmethod
-    def _build_tool(target: Callable, description: str) -> BaseTool:
+    def build_tool(target: Callable, description: str) -> BaseTool:
         """Instantiate a concrete LangChain ``BaseTool``."""
         return create_tool_from_callable(target=target, description=description)
 
@@ -40,7 +40,7 @@ class ToolFactory:
         for name, cfg in TOOLS_CONFIG._raw.items():
             # ``cfg`` is a BaseToolConfig (target is a string)
             callable_obj = ToolFactory._resolve_tool_callable(cfg.target)  # pyright: ignore
-            tools_dict[name] = ToolFactory._build_tool(  # pyright: ignore
+            tools_dict[name] = ToolFactory.build_tool(  # pyright: ignore
                 target=callable_obj, description=cfg.description
             )
         return ToolConfigNamespace(tools_dict)
@@ -57,7 +57,14 @@ class AgentFactory:
     """
 
     @staticmethod
-    def _build_agent(name: str, cfg: BaseAgentConfig) -> Agent:
+    def build_agent(name: str, prompt: str, tools: Optional[List[BaseTool]] = None):
+        """
+        Build basic agent with name, prompt and tools
+        """
+        return Agent(name=name, prompt=prompt, tools=tools).create_agent()
+
+    @staticmethod
+    def _build_agent_from_config(name: str, cfg: BaseAgentConfig) -> Agent:
         """
         Create an ``Agent`` instance and attach the tools listed in the
         agent’s config (if any) by resolving them from toolbox package.
@@ -83,5 +90,5 @@ class AgentFactory:
         """Build all agents defined in ``AGENTS_CONFIG``."""
         agents_dict: Dict[str, Agent] = {}
         for agent_name, agent_cfg in AGENTS_CONFIG._raw.items():
-            agents_dict[agent_name] = AgentFactory._build_agent(agent_name, agent_cfg)
+            agents_dict[agent_name] = AgentFactory._build_agent_from_config(agent_name, agent_cfg)
         return AgentConfigNamespace(agents_dict)

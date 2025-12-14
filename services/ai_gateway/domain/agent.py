@@ -70,7 +70,7 @@ class Agent:
 
         return self
 
-    def ask(self, query: str) -> str:
+    async def ask(self, query: str) -> str:
         """
         Send a user query to the built agent and return the final response text.
         """
@@ -79,7 +79,7 @@ class Agent:
                 "Agent not initialised - call ``create_agent()`` before ``invoke()``."
             )
 
-        response = self.agent.invoke(  # pyright: ignore
+        response = await self.agent.ainvoke(  # pyright: ignore
             {
                 "messages": [{"role": "user", "content": query}],
             }

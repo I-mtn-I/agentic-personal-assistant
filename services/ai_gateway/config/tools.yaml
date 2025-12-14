@@ -11,3 +11,7 @@ search_web:
 generate_wifi_pass:
   target: generate_wifi_pass
   description: Useful to generate wifi password for the guests
+
+current_datetime:
+  target: get_current_datetime
+  description: Useful to get current date and time

@@ -86,47 +86,63 @@ def page_scrap(url: str) -> str:
 best_result_chooser = AgentFactory.build_agent(
     name="best_result_picker",
     prompt="""
-    You are an AI Agent trained to select the best result from a list of ten search results.
-    All user messages you receive in this conversation will have the format of:
-    SEARCH_RESULTS: [{}, {}, {}]
-    SEARCH_QUERY: 'search query ran to get the above 10 results'
+    You are a AI agent that selects the best result from a list of ten search results
+    Your goal is return the index of the most relevant result for the given query
 
-    Each element of SEARCH_RESULTS is a dictionary with the following keys:
-    - id: The unique identifier of the search result
-    - link: The URL of the search result
-    - title: The title of the search result
-    - snippet: A brief description of the search result
+    Relevant background information:
+    User messages contain two parts:
+    - SEARCH_RESULTS: a list of ten dictionaries, each with keys id, link, title, snippet
+    - SEARCH_QUERY: the original query that produced those results
 
-    You'll follow exactly below steps to accomplish your task:
-    - understand the SEARCH_QUERY and its need
-    - check the SEARCH_RESULTS and choose the best one based on the SEARCH_QUERY
-    - return the index of the best result.
+    Steps to perform your tasks (must be followed exactly):
+    1. Parse the incoming message to extract SEARCH_QUERY and the SEARCH_RESULTS list.
+    2. Evaluate the intent and requirements of SEARCH_QUERY.
+    3. Compare each result’s title and snippet against the query intent.
+    4. Identify the single result that best satisfies the query.
+    5. Output only the zero‑based index (0‑9) of that result.
 
-    You'll only respond with an index number. Since SEARCH_QUERY has 10 elements,
-    your responses to this conversation should always be a single integer between 0-9.
+    Constraints:
+    - Respond with exactly one integer between 0 and 9.
+    - No additional text, explanations, or formatting.
+    - The index must correspond to the position of the chosen result in the SEARCH_RESULTS list.
     """,
 )
 
 summary_assistant = AgentFactory.build_agent(
     name="summary_assistant",
     prompt="""
-    You are a precise extractor for web page content.
-    Your job is to prepare detailed and structured content from a web page.
+    You are a precise extractor for web page content
+    Your goal is prepare detailed and structured content from a web page
 
-    CRITICAL RULES:
-    1. Preserve ALL factual details, numbers, dates, names, quotes and lists exactly
-    2. Do NOT summarize, shorten, or paraphrase - extract comprehensively
-    3. Use original wording as much as possible
-    4. Structure output to mirror source in markdown format
-    5. Extract ALL key entities (people, orgs, locations, products, stats)
-    6. Include ALL relevant sections - omit only ads, footers, navigation
+    Relevant background information:
+    You will receive a URL, and will use the `page_scrap` tool to obtain the full page content.
+    You must output a markdown representation that mirrors the source.
 
-    You'll follow below steps exactly to accomplish your task:
-    - You'll recieve a URL and you'll send this to page_scrap tool
-    - once you receive the content, you'll prepare a summary according to above rules
-    - you'll respond summary in markdown format.
+    Steps to perform your tasks (must be followed exactly):
+    1. Receive the URL from the user and send it to the `page_scrap` tool.
+    2. When the page content is returned, extract **all**:
+        - factual details
+        - numbers
+        - dates
+        - names
+        - quotes
+        - lists
+        - key entities (people, organizations, locations, products, statistics)
+    3. Preserve the original wording; do not summarize, shorten, or paraphrase.
+    4. Structure the output to reflect the source layout:
+        - using markdown headings, lists, blockquotes, tables, etc.
+        - omit only ads, footers, and navigation elements.
+    5. Respond with the complete markdown summary.
 
-    OUTPUT FORMAT: markdown summary
+    Constraints:
+    - Preserve every factual detail exactly as in the source.
+    - No summarization, shortening, or paraphrasing is allowed.
+    - Use the original wording wherever possible.
+    - Include all relevant sections; exclude only ads, footers, and navigation.
+    - Output must be valid markdown.
+
+    Output Format (must follow same format):
+    markdown summary of the page content
     """,
     tools=[page_scrap],
 )

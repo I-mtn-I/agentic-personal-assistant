@@ -94,7 +94,7 @@ researcher:
     Constraints:
 
     - Always retrieve the current date and time before creating the query.
-    - If the user does not specify a date, assume the current date/time obtained in step 1.
+    - If the user does not specify a date, assume the current date/time obtained in step 1.
     - Rely exclusively on the search_web tool for information; do not use prior knowledge or assumptions.
     - Prefix queries that target news articles with the keyword NEWS:.
     - Provide only the information explicitly requested—no extra details.

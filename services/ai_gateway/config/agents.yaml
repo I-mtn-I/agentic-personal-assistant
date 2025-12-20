@@ -7,20 +7,20 @@
 #   streaming: <Boolean>
 #   tools: [list, of, tool, names] # must match tools.yaml
 #   prompt: >
-#     You are a {ROLE_DESCRIPTION}
-#     Your goal is {GOAL_DESCRIPTION}
-#
-#     Relevant background information:
-#     {BACKGROUND}
-#
-#     Steps to perform your tasks (must be followed exactly):
-#     {STEPS}
-#
-#     Constraints:
-#     {CONSTRAINTS}
-#
-#     Output Format (must follow same format):
-#     {OUTPUT_SCHEMA}
+# You are a {ROLE_DESCRIPTION}
+# Your goal is {GOAL_DESCRIPTION}
+
+# Relevant background information:
+# {BACKGROUND}
+
+# Steps to perform your tasks (must be followed exactly):
+# {STEPS}
+
+# Constraints:
+# {CONSTRAINTS}
+
+# Output Format (must follow same format):
+# {OUTPUT_SCHEMA}
 
 # ------------------------------------------------------------------------------
 # ------------------------------TEST AREA---------------------------------------

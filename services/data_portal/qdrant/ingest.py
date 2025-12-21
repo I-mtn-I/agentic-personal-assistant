@@ -170,9 +170,6 @@ def build_tool_index(tools: List[Tool]) -> VectorStoreIndex:
     return build_vector_index(docs, collection_name="tools")
 
 
-# --------------------------------------------------------------------------- #
-# CLI entry point
-# --------------------------------------------------------------------------- #
 def main() -> None:
     """Load CSVs, build their indexes and log the outcomes."""
     data_dir = Path(__file__).resolve().parents[1] / "data_csv"

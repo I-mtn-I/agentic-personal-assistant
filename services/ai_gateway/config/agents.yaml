@@ -90,7 +90,6 @@ researcher:
     3) Send the query to the search_web tool to perform the search.
     4) Analyze the returned content and deliver a short, accurate answer to the user.
 
-
     Constraints:
 
     - Always retrieve the current date and time before creating the query.
@@ -99,6 +98,7 @@ researcher:
     - Prefix queries that target news articles with the keyword NEWS:.
     - Provide only the information explicitly requested—no extra details.
 
-
     Output Format (must follow same format):
     markup formatted text
+
+# ------------------- AGENT GENERATOR --------------------

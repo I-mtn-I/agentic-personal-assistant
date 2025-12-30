@@ -30,16 +30,17 @@ class AppConfig(BaseSettings):
     POSTGRES_DB: str
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
+    QDRANT_HOST: str
+    QDRANT_PORT: str
     LLM_HOST: str
     LLM_MODEL: str
     LLM_EMBED_MODEL: str
-    QDRANT_HOST: str
-    QDRANT_PORT: str
 
     model_config = SettingsConfigDict(env_file=str(ENV_PATH), env_file_encoding="utf-8")
 
 
 def _load_env(load_dotenv_file: bool = True) -> AppConfig:
+    log.debug(f"ENV_PATH: {ENV_PATH}")
     if load_dotenv_file and ENV_PATH.exists():
         load_dotenv(dotenv_path=ENV_PATH)
     config = AppConfig()  # pyright: ignore[reportCallIssue]

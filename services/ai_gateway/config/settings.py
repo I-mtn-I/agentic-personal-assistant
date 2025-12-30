@@ -41,6 +41,8 @@ class AppConfig(BaseSettings):
     POSTGRES_DB: str
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
+    QDRANT_HOST: str
+    QDRANT_PORT: str
     LLM_HOST: str
     LLM_MODEL: str
     LLM_EMBED_MODEL: str

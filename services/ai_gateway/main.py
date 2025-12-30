@@ -44,11 +44,17 @@ def main():
     # response = asyncio.run(supervisor_agent.ask("I'm at room 451, What is the Wi-Fi password?"))
     # print(response)
 
-    # TEST AREA:
+    # default_agents = AgentFactory.generate_default_agents()
+    # response = asyncio.run(
+    #     default_agents.researcher.ask(
+    #         "What are the recent developments in Asia that are related to climate change?"
+    #     )
+    # )
+    # print(response)
     default_agents = AgentFactory.generate_default_agents()
     response = asyncio.run(
-        default_agents.researcher.ask(
-            "What are the recent developments in Asia that are related to climate change?"
+        default_agents.configuration_manager.ask(
+            "I need a team to perform a research on a subject and create a comprehensive report"
         )
     )
     print(response)

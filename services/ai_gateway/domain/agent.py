@@ -101,15 +101,14 @@ class Agent:
             query: str = Field(description="The query to pass to the agent")
 
         @tool(args_schema=AgentInput)
-        def agent_tool(query: str) -> str:
+        async def agent_tool(query: str) -> str:
             """Call the agent to handle specialized tasks."""
             if self.agent:
-                response = self.agent.invoke({"messages": [{"role": "user", "content": query}]})  # pyright: ignore
-                return response["messages"][-1].content
-            else:
-                raise ValueError(
-                    "No agent found, did you forget to create it? (Agent.create_agent)"
+                response = await self.agent.ainvoke(  # pyright: ignore
+                    {"messages": [{"role": "user", "content": query}]}
                 )
+                return response["messages"][-1].content
+            raise ValueError("No agent found, did you forget to create it? (Agent.create_agent)")
 
         agent_tool.name = f"{self.name}_tool"
         agent_tool.description = f"{description}"

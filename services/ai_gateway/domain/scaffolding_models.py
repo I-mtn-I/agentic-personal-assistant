@@ -12,6 +12,7 @@ class AgentCreationTask(BaseModel):
     id: str = Field(description="Task ID")
     name: str = Field(description="Agent name")
     purpose: str = Field(description="Agent's purpose")
+    is_manager: bool = Field(default=False, description="Whether the agent is the manager")
     tools: list[str] = Field(default_factory=list, description="Tools available for the agent")
     system_prompt: str = Field(default="", description="System prompt of the agent")
 

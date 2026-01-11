@@ -9,5 +9,6 @@
   "reportMissingTypeStubs": false,
   "reportUnknownVariableType": "warning",
   "reportUnknownMemberType": "warning",
-  "reportUnknownLambdaType": "warning"
+  "reportUnknownLambdaType": "warning",
+  "reportMaximumLineLength": 250,
 }

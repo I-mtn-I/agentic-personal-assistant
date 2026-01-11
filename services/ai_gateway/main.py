@@ -1,7 +1,10 @@
 import asyncio
 import random
+import uuid
 
-from ai_gateway.domain import AgentFactory
+from ai_gateway.config import APP_CONFIG
+from ai_gateway.domain.agent_factory import AgentFactory, ToolFactory
+from ai_gateway.domain.agent_persistence import AgentConfigRepository
 
 
 def generate_hilton_guest_password():
@@ -51,12 +54,45 @@ def main():
     #     )
     # )
     # print(response)
-    default_agents = AgentFactory.generate_default_agents()
-    response = asyncio.run(
-        default_agents.configuration_manager.ask(
-            "I need a team to perform a research on a subject and create a comprehensive report"
-        )
+
+    repo = AgentConfigRepository.from_app_config(APP_CONFIG)
+
+    team_id_raw = "0fbb40a9-9ea1-4db3-bf9b-f8c66b30ac0e"
+    if team_id_raw:
+        team_record = repo.get_team_config(team_id=uuid.UUID(team_id_raw))
+    else:
+        team_record = repo.get_latest_team_config()
+
+    if not team_record:
+        raise ValueError("No team configuration found in database.")
+
+    manager_record = repo.get_agent_config_by_id(agent_config_id=team_record.manager_agent_id)
+    if not manager_record:
+        raise ValueError("Manager agent config not found for the selected team.")
+
+    manager_tools = [ToolFactory.get_tool_by_name(tool.name) for tool in manager_record.tools]
+    manager_agent = AgentFactory.build_agent(
+        manager_record.agent_name, manager_record.system_prompt, manager_tools
     )
+
+    for agent_config_id in team_record.agent_config_ids:
+        if agent_config_id == team_record.manager_agent_id:
+            continue
+        sub_record = repo.get_agent_config_by_id(agent_config_id=agent_config_id)
+        if not sub_record:
+            raise ValueError(f"Sub-agent config not found: {agent_config_id}")
+
+        sub_tools = [ToolFactory.get_tool_by_name(tool.name) for tool in sub_record.tools]
+        sub_agent = AgentFactory.build_agent(
+            sub_record.agent_name, sub_record.system_prompt, sub_tools
+        )
+        manager_agent = manager_agent.extend_agent_with_subagent(
+            sub_agent,
+            f"Sub-agent for: {sub_record.purpose}",
+        )
+
+    user_prompt = "What are the recent news about Elon Musk? (Jan 2026)"
+    response = asyncio.run(manager_agent.ask(user_prompt))
     print(response)
 
 

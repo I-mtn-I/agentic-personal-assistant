@@ -1,4 +1,6 @@
+import json
 import logging
+import re
 
 import requests
 import trafilatura
@@ -86,25 +88,26 @@ def page_scrap(url: str) -> str:
 best_result_chooser = AgentFactory.build_agent(
     name="best_result_picker",
     prompt="""
-    You are a AI agent that selects the best result from a list of ten search results
-    Your goal is return the index of the most relevant result for the given query
+    You are an AI agent that selects the best result from a list of search results.
+    Your goal is to return the zero-based index of the most relevant result for the given query.
 
     Relevant background information:
-    User messages contain two parts:
-    - SEARCH_RESULTS: a list of ten dictionaries, each with keys id, link, title, snippet
-    - SEARCH_QUERY: the original query that produced those results
+    You will receive a JSON object with:
+    - search_query: the original query that produced the results
+    - search_results: a list of dictionaries with keys id, url, title, result_snippet
+    - result_count: the number of results in the list
 
     Steps to perform your tasks (must be followed exactly):
-    1. Parse the incoming message to extract SEARCH_QUERY and the SEARCH_RESULTS list.
-    2. Evaluate the intent and requirements of SEARCH_QUERY.
-    3. Compare each result’s title and snippet against the query intent.
+    1. Parse the incoming JSON to extract search_query and search_results.
+    2. Evaluate the intent and requirements of search_query.
+    3. Compare each result's title and result_snippet against the query intent.
     4. Identify the single result that best satisfies the query.
-    5. Output only the zero‑based index (0‑9) of that result.
+    5. Output only the zero-based index (0 to result_count-1) of that result.
 
     Constraints:
-    - Respond with exactly one integer between 0 and 9.
+    - Respond with exactly one integer between 0 and result_count-1.
     - No additional text, explanations, or formatting.
-    - The index must correspond to the position of the chosen result in the SEARCH_RESULTS list.
+    - The index must correspond to the position of the chosen result in search_results.
     """,
 )
 
@@ -151,11 +154,40 @@ summary_assistant = AgentFactory.build_agent(
 async def search_web(query: str) -> str:
     try:
         search_results = duckduckgo_search(query)  # Perform search
-        results_str = "\n".join(str(result) for result in search_results)  # Prepare results string
-        best_result = await best_result_chooser.ask(results_str)  # Get best result
-        choosen_link = search_results[int(best_result)].url  # Extract chosen URL
+        if not search_results:
+            return "No results found."
+        results_payload = {
+            "search_query": query,
+            "result_count": len(search_results),
+            "search_results": [
+                {
+                    "id": result.id,
+                    "url": result.url,
+                    "title": result.title,
+                    "result_snippet": result.result_snippet,
+                }
+                for result in search_results
+            ],
+        }
+        results_str = json.dumps(results_payload, ensure_ascii=True)
+        best_result_raw = await best_result_chooser.ask(results_str)  # Get best result
+        chosen_index = _parse_best_result_index(best_result_raw, len(search_results))
+        choosen_link = search_results[chosen_index].url  # Extract chosen URL
         summary = await summary_assistant.ask(choosen_link)  # Get summary
         return summary
     except Exception as e:
         logging.error(f"An error occurred during web search: {e}")  # Log the error
         return "An error occurred while processing your request."
+
+
+def _parse_best_result_index(response_text: str, result_count: int) -> int:
+    if result_count <= 0:
+        return 0
+    candidates = [int(match) for match in re.findall(r"-?\d+", response_text)]
+    for value in candidates:
+        if 0 <= value < result_count:
+            return value
+    for value in candidates:
+        if 1 <= value <= result_count:
+            return value - 1
+    return 0

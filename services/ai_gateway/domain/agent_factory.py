@@ -39,8 +39,8 @@ class ToolFactory:
         tools_dict: Dict[str, BaseTool] = {}
         for name, cfg in TOOLS_CONFIG._raw.items():
             # ``cfg`` is a BaseToolConfig (target is a string)
-            callable_obj = ToolFactory._resolve_tool_callable(cfg.target)  # pyright: ignore
-            tools_dict[name] = ToolFactory.build_tool(  # pyright: ignore
+            callable_obj = ToolFactory._resolve_tool_callable(cfg.target)
+            tools_dict[name] = ToolFactory.build_tool(
                 target=callable_obj, description=cfg.description
             )
         return ToolConfigNamespace(tools_dict)

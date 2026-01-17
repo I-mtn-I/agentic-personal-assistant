@@ -22,7 +22,7 @@
 # )
 
 # # Create a query engine from the index - llamaindex FTW!
-# query_engine = index.as_query_engine()  # pyright: ignore
+# query_engine = index.as_query_engine()
 
 
 # async def query_vector_db(query: str):

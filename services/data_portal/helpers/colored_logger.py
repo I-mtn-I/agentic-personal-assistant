@@ -4,7 +4,7 @@ from __future__ import annotations
 import datetime
 import sys
 from enum import Enum, auto
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Callable, Optional, Protocol, cast
 
 from colorama import Fore, Style, init
 
@@ -38,12 +38,15 @@ class LogLevel(Enum):
     @property
     def colour(self) -> str:
         """Colour code from ``colorama``."""
-        return {
-            LogLevel.DEBUG: Fore.BLUE,
-            LogLevel.INFO: Fore.GREEN,
-            LogLevel.WARN: Fore.YELLOW,
-            LogLevel.ERROR: Fore.RED,
-        }[self]
+        return cast(
+            str,
+            {
+                LogLevel.DEBUG: Fore.BLUE,
+                LogLevel.INFO: Fore.GREEN,
+                LogLevel.WARN: Fore.YELLOW,
+                LogLevel.ERROR: Fore.RED,
+            }[self],
+        )
 
 
 # ----------------------------------------------------------------------

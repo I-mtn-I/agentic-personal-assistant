@@ -1,5 +1,5 @@
 from .date_time_now import get_current_datetime
-from .db_query_tool import query_pgdb  # pyright: ignore
+from .db_query_tool import query_pgdb
 from .search_web_tool import search_web
 from .wifi_pass_generator_tool import generate_wifi_pass
 

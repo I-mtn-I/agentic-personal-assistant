@@ -17,8 +17,10 @@ repos:
         additional_dependencies: []
       - id: ruff-format
 
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.407
+  - repo: local
     hooks:
-      - id: pyright
-        args: []
+      - id: ty
+        name: ty
+        entry: bash -c 'cd services && uv run ty check ai_gateway data_portal'
+        language: system
+        pass_filenames: false

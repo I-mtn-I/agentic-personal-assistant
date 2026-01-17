@@ -37,7 +37,7 @@ async def main() -> None:
     persistence = AgentConfigRepository.from_app_config(APP_CONFIG)
 
     user_request = (
-        "I need a team to perform a search from web on a given subject and create a detailednse."
+        "I need a team to perform a search the web on a given subject and create a report."
     )
 
     await run_agent_scaffolding(user_request, agents, persistence)

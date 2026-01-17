@@ -43,7 +43,7 @@ Backend services that make up the Agentic Personal Assistant. Currently only `ai
   - `tools/`: Concrete LangChain/LlamaIndex tool implementations
 - `example.env`: Template of environment variables consumed by `ai_gateway`
 - `pyproject.toml`: Shared dependency + tooling definitions for all Python services
-- `pyrightconfig.json`: Type-checker configuration
+- `ty.toml`: Type-checker configuration
 - `uv.lock`: Resolved dependency lock
 - `.python-version`: Python version pin (3.13.0)
 
@@ -95,7 +95,7 @@ uv venv
 source .venv/bin/activate
 uv sync --all-groups
 
-# Install git hooks (ruff + pyright)
+# Install git hooks (ruff + ty)
 uv run pre-commit install
 ```
 
@@ -104,7 +104,7 @@ uv run pre-commit install
 1. Install recommended extensions when prompted, or manually install:
    - Ruff (charliermarsh.ruff)
    - Python (ms-python.python)
-   - Pyright (ms-pyright.pyright)
+   - Ty (optional; CLI-driven by default)
    - Docker (ms-azuretools.vscode-docker)
    - YAML (redhat.vscode-yaml)
 
@@ -123,7 +123,7 @@ Run from `services/` directory:
 
 - `uv run ruff check ai_gateway` – lint
 - `uv run ruff format ai_gateway` – format
-- `uv run pyright` – type-check
+- `uv run ty check ai_gateway data_portal` – type-check
 - `uv run python -m ai_gateway.main` – run the sample agent
 
 See `.pre-commit-config.yaml` for enforced checks on commits.

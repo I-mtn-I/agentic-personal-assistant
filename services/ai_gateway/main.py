@@ -48,10 +48,11 @@ def main():
     # response = asyncio.run(supervisor_agent.ask("I'm at room 451, What is the Wi-Fi password?"))
     # print(response)
 
+    # Temp tool test for web search:
     default_agents = AgentFactory.generate_default_agents()
     response = asyncio.run(
         default_agents.researcher.ask(
-            "What are the recent developments in Asia that are related to climate change?"
+            "What was the last statement from Donald Trump? indicate the source and date time."
         )
     )
     print(response)
@@ -95,7 +96,7 @@ def main():
     #         f"Sub-agent for: {sub_record.purpose}",
     #     )
 
-    # user_prompt = "What are the recent news about Elon Musk? (Jan 2026)"
+    # user_prompt = "What are the recent developments in Asia that are related to climate change?"
     # response = asyncio.run(manager_agent.ask(user_prompt))
     # print(response)
 

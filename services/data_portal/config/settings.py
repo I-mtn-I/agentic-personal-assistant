@@ -43,7 +43,7 @@ def _load_env(load_dotenv_file: bool = True) -> AppConfig:
     log.debug(f"ENV_PATH: {ENV_PATH}")
     if load_dotenv_file and ENV_PATH.exists():
         load_dotenv(dotenv_path=ENV_PATH)
-    config = AppConfig()  # pyright: ignore[reportCallIssue]
+    config = AppConfig.model_validate(os.environ)
     return config
 
 

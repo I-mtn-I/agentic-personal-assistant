@@ -1,0 +1,15 @@
+[environment]
+python-version = "3.13"
+
+[src]
+include = ["ai_gateway", "data_portal"]
+exclude = [
+  "**/__pycache__/**",
+  "**/.pytest_cache/**",
+  "**/.ruff_cache/**",
+  "**/.mypy_cache/**",
+  "**/.venv/**",
+  "**/build/**",
+  "**/dist/**",
+  "**/node_modules/**",
+]

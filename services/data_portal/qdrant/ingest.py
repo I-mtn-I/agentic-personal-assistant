@@ -60,7 +60,7 @@ def _apply_list_parsers(
 
 def load_csv_as_models(
     csv_path: Path,
-    model_cls: Callable[..., T],
+    model_cls: type[T],
     list_columns: Optional[Iterable[str]] = None,
 ) -> List[T]:
     """
@@ -79,7 +79,7 @@ def load_csv_as_models(
     instances: List[T] = []
     for _, row in df.iterrows():
         try:
-            instances.append(model_cls(**row.to_dict()))  # type: ignore[arg-type]
+            instances.append(model_cls(**row.to_dict()))
         except ValidationError as exc:
             log.error(
                 "Row %s failed validation for %s: %s",
@@ -99,7 +99,7 @@ def _get_embedding_model() -> OllamaEmbedding:
 
 
 def _get_qdrant_client() -> qdrant_client.QdrantClient:
-    """Factory for a Qdrant client – keeps host/port in one place."""
+    """Factory for a Qdrant client - keeps host/port in one place."""
     return qdrant_client.QdrantClient(
         host=APP_CONFIG.QDRANT_HOST,
         port=int(APP_CONFIG.QDRANT_PORT),
@@ -126,7 +126,7 @@ def build_vector_index(
 # Domain‑specific loaders & index builders
 # --------------------------------------------------------------------------- #
 def load_agents(csv_path: Path) -> List[Agent]:
-    """Load ``agents.csv`` – parses ``tools_list`` and ``tags`` as list fields."""
+    """Load ``agents.csv`` - parses ``tools_list`` and ``tags`` as list fields."""
     return load_csv_as_models(
         csv_path,
         Agent,
@@ -135,7 +135,7 @@ def load_agents(csv_path: Path) -> List[Agent]:
 
 
 def load_tools(csv_path: Path) -> List[Tool]:
-    """Load ``tools.csv`` – parses ``tags`` as a list field."""
+    """Load ``tools.csv`` - parses ``tags`` as a list field."""
     return load_csv_as_models(
         csv_path,
         Tool,

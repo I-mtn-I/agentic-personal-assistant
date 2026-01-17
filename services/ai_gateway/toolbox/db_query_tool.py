@@ -5,7 +5,7 @@ from llama_index.llms.ollama import Ollama
 
 from ai_gateway.config import APP_CONFIG
 
-pg_db = SQLDatabase.from_uri(  # pyright: ignore
+pg_db = SQLDatabase.from_uri(
     (
         f"postgresql://{APP_CONFIG.POSTGRES_USER}:{APP_CONFIG.POSTGRES_PASSWORD}"
         f"@{APP_CONFIG.POSTGRES_HOST}:{APP_CONFIG.POSTGRES_PORT}/{APP_CONFIG.POSTGRES_DB}"

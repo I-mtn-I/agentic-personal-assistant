@@ -79,7 +79,7 @@ class Agent:
                 "Agent not initialised - call ``create_agent()`` before ``invoke()``."
             )
 
-        response = await self.agent.ainvoke(  # pyright: ignore
+        response = await self.agent.ainvoke(
             {
                 "messages": [{"role": "user", "content": query}],
             }
@@ -104,7 +104,7 @@ class Agent:
         async def agent_tool(query: str) -> str:
             """Call the agent to handle specialized tasks."""
             if self.agent:
-                response = await self.agent.ainvoke(  # pyright: ignore
+                response = await self.agent.ainvoke(
                     {"messages": [{"role": "user", "content": query}]}
                 )
                 return response["messages"][-1].content

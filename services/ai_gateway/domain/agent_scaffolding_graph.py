@@ -9,6 +9,7 @@ from typing import Any
 
 from data_portal.helpers.colored_logger import ColoredLogger
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Send
 
 from ai_gateway.config.settings import TOOLS_CONFIG
@@ -481,7 +482,7 @@ Return your response as a JSON object with the required structure."""
                         other_purpose = other_task.purpose if other_task else "N/A"
 
                         tools_str = ", ".join(other_tools) if other_tools else "None"
-                        other_agents_context.append(  # pyright: ignore
+                        other_agents_context.append(
                             f"- {other_result.name}: {other_purpose}\n  Tools: {tools_str}"
                         )
                     except (json.JSONDecodeError, KeyError):
@@ -642,7 +643,7 @@ Please review this agent configuration and provide an audit report."""
                         )
                         continue
 
-                    retry_sends.append(  # pyright: ignore
+                    retry_sends.append(
                         Send(
                             "agent_generator",
                             {
@@ -706,35 +707,23 @@ Please review this agent configuration and provide an audit report."""
                         manager_agent_id=self._manager_agent_config_id,
                         user_request=self._team_user_request,
                     )
-                except Exception as exc:  # pragma: no cover - fail-safe persistence
+                except Exception as exc:
                     self.logger.error(f"Failed to persist team config: {exc}")
             else:
                 self.logger.warn("Skipping team persistence: manager agent not persisted.")
 
         return {"final_output": final}
 
-    def build_graph(self) -> StateGraph:
+    def build_graph(self) -> CompiledStateGraph:
         """Build and compile the agent scaffolding graph."""
         builder = StateGraph(GraphState)
 
-        async def planner_wrapper(state: GraphState) -> dict[str, Any]:
-            return await self.planner_node(state)
-
-        async def plan_qa_wrapper(state: GraphState) -> dict[str, Any]:
-            return await self.plan_qa_node(state)
-
-        async def agent_generator_wrapper(state: GraphState | dict[str, Any]) -> dict[str, Any]:
-            return await self.agent_generator_node(state)
-
-        async def qa_wrapper(state: GraphState | dict[str, Any]) -> dict[str, Any]:
-            return await self.qa_node(state)
-
-        builder.add_node("planner", planner_wrapper)  # pyright: ignore
-        builder.add_node("plan_qa", plan_qa_wrapper)  # pyright: ignore
-        builder.add_node("agent_generator", agent_generator_wrapper)  # pyright: ignore
-        builder.add_node("qa", qa_wrapper)  # pyright: ignore
-        builder.add_node("qa_barrier", self._qa_review_barrier)  # pyright: ignore
-        builder.add_node("aggregator", self.aggregator_node)  # pyright: ignore
+        builder.add_node("planner", self.planner_node)
+        builder.add_node("plan_qa", self.plan_qa_node)
+        builder.add_node("agent_generator", self.agent_generator_node)
+        builder.add_node("qa", self.qa_node)
+        builder.add_node("qa_barrier", self._qa_review_barrier)
+        builder.add_node("aggregator", self.aggregator_node)
 
         builder.add_edge(START, "planner")
         builder.add_edge("planner", "plan_qa")
@@ -804,7 +793,7 @@ Please review this agent configuration and provide an audit report."""
         builder.add_conditional_edges("qa_barrier", self._route_qa_results)
         builder.add_edge("aggregator", END)
 
-        return builder.compile()  # pyright: ignore
+        return builder.compile()
 
     async def run(self, user_request: str) -> str:
         self._team_id = uuid.uuid4()
@@ -818,7 +807,7 @@ Please review this agent configuration and provide an audit report."""
         self.logger.info(f"User Request: {user_request}")
         self.logger.info("")
 
-        graph = self.build_graph()  # pyright: ignore
+        graph = self.build_graph()
 
         initial_state = GraphState(
             user_request=user_request,
@@ -827,7 +816,7 @@ Please review this agent configuration and provide an audit report."""
             final_output="",
         )
 
-        result = await graph.ainvoke(initial_state.model_dump(), {"recursion_limit": 100})  # pyright: ignore
+        result = await graph.ainvoke(initial_state.model_dump(), {"recursion_limit": 100})
 
         self.logger.info("=" * 70)
         self.logger.info("FINAL OUTPUT:")

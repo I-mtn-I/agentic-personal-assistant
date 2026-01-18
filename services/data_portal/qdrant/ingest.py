@@ -48,9 +48,7 @@ def parse_list_field(value: Optional[object]) -> List[str]:
     return [part.strip() for part in str(value).split(";") if part.strip()]
 
 
-def _apply_list_parsers(
-    df: pd.DataFrame, columns: Iterable[str], parser: Callable[[object], List[str]]
-) -> pd.DataFrame:
+def _apply_list_parsers(df: pd.DataFrame, columns: Iterable[str], parser: Callable[[object], List[str]]) -> pd.DataFrame:
     """Apply *parser* to each column in *columns* (in‑place)."""
     for col in columns:
         if col in df.columns:
@@ -159,10 +157,7 @@ def build_tool_index(tools: List[Tool]) -> VectorStoreIndex:
     """Index tools; document text is a concise description + optional signature."""
     docs = [
         Document(
-            text=(
-                f"{tool.name}: {tool.description}"
-                + (f"\nSignature: {tool.signature}" if tool.signature else "")
-            ),
+            text=(f"{tool.name}: {tool.description}" + (f"\nSignature: {tool.signature}" if tool.signature else "")),
             metadata=tool.model_dump(),
         )
         for tool in tools

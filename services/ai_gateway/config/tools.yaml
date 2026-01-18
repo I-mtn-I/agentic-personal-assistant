@@ -2,16 +2,48 @@
 
 query_pgdb:
   target: query_pgdb
-  description: Useful to query database with natural language
+  description: Useful for querying statistical data from database with natural language
+  tags: [data, db]
+  disallowed_tags: [manager, orchestration, report, summary, planning]
 
-search_web:
-  target: search_web
-  description: Useful perform a web search
+# search_web:
+#   target: search_web
+#   description: Useful to perform a research from web and get a parsed relevant answer.
+#   tags: [search, web, research]
+#   disallowed_tags: [manager, orchestration, report, summary]
+
+duckduckgo_search:
+  target: duckduckgo_search
+  description: Useful to run a DuckDuckGo search and return list of result metadata
+  tags: [search, web, research]
+  disallowed_tags: [manager, orchestration, report, summary]
+
+page_scrap:
+  target: page_scrap
+  description: Useful to extract content from a web page
+  tags: [search, web, research]
+  disallowed_tags: [manager, orchestration, report, summary]
 
 generate_wifi_pass:
   target: generate_wifi_pass
-  description: Useful to generate wifi password for the guests
+  description: Useful to generate wifi password
+  tags: [admin, support]
+  disallowed_tags: [manager, orchestration]
 
 current_datetime:
   target: get_current_datetime
-  description: Useful to get current date and time
+  description: Useful to get current date and time. Use  this tool for reaching recent information.
+  tags: [time, search, research, web]
+  disallowed_tags: [manager, orchestration]
+
+list_available_tools:
+  target: list_available_tools
+  description: Useful to get a filtered list of available tools by tags with descriptions.
+  tags: [tools, meta, planning]
+  disallowed_tags: []
+
+list_all_tools:
+  target: list_all_tools
+  description: Useful to list all tools with tags and disallowed tags.
+  tags: [tools, meta, planning]
+  disallowed_tags: []

@@ -50,10 +50,7 @@ class AgentConfigRepository:
 
     @classmethod
     def from_app_config(cls, config: AppConfig) -> "AgentConfigRepository":
-        dsn = (
-            f"postgresql://{config.POSTGRES_USER}:{config.POSTGRES_PASSWORD}"
-            f"@{config.POSTGRES_HOST}:{config.POSTGRES_PORT}/{config.POSTGRES_DB}"
-        )
+        dsn = f"postgresql://{config.POSTGRES_USER}:{config.POSTGRES_PASSWORD}@{config.POSTGRES_HOST}:{config.POSTGRES_PORT}/{config.POSTGRES_DB}"
         return cls(dsn=dsn)
 
     def _connect(self) -> PgConnection:
@@ -256,10 +253,7 @@ class AgentConfigRepository:
                     """,
                     (agent_config_id,),
                 )
-                tools = [
-                    ToolSpec(name=name, target=target, description=description)
-                    for name, target, description in cur.fetchall()
-                ]
+                tools = [ToolSpec(name=name, target=target, description=description) for name, target, description in cur.fetchall()]
 
         return AgentConfigRecord(
             id=uuid.UUID(str(row[0])),
@@ -307,10 +301,7 @@ class AgentConfigRepository:
                     """,
                     (str(agent_config_id),),
                 )
-                tools = [
-                    ToolSpec(name=name, target=target, description=description)
-                    for name, target, description in cur.fetchall()
-                ]
+                tools = [ToolSpec(name=name, target=target, description=description) for name, target, description in cur.fetchall()]
 
         return AgentConfigRecord(
             id=uuid.UUID(str(row[0])),

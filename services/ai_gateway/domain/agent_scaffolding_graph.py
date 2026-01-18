@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from pathlib import Path
 from typing import Any
 
 from data_portal.helpers.colored_logger import ColoredLogger
@@ -12,13 +13,17 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Send
 
-from ai_gateway.config.settings import TOOLS_CONFIG
+from ai_gateway.config.settings import AVAILABLE_TAGS, TOOLS_CONFIG
 from ai_gateway.domain.agent import Agent
 from ai_gateway.domain.agent_persistence import AgentConfigRepository, ToolSpec
 from ai_gateway.domain.scaffolding_models import (
     AgentCreationTask,
     AgentCreationTaskResult,
+    AgentGeneratorOutput,
+    AgentQAOutput,
     GraphState,
+    PlannerOutput,
+    PlanQAOutput,
     PlanTask,
 )
 from ai_gateway.utils import extract_json_from_response
@@ -52,9 +57,7 @@ class AgentScaffoldingGraph:
         return None
 
     @staticmethod
-    def _find_previous_result(
-        task_results: list[AgentCreationTaskResult], task_id: str
-    ) -> tuple[AgentCreationTaskResult | None, str, int]:
+    def _find_previous_result(task_results: list[AgentCreationTaskResult], task_id: str) -> tuple[AgentCreationTaskResult | None, str, int]:
         """
         Find previous result for a task.
 
@@ -65,6 +68,17 @@ class AgentScaffoldingGraph:
             if existing.task_id == task_id:
                 return existing, existing.feedback, existing.retry_count + 1
         return None, "", 0
+
+    @staticmethod
+    def _extract_structured_response(response: dict[str, Any]) -> dict[str, Any] | None:
+        structured = response.get("structured_response")
+        if structured is None:
+            return None
+        if hasattr(structured, "model_dump"):
+            return structured.model_dump()
+        if isinstance(structured, dict):
+            return structured
+        return None
 
     @staticmethod
     def _get_latest_results(
@@ -100,11 +114,102 @@ class AgentScaffoldingGraph:
 
         return latest
 
-    def _get_available_tools_info(self) -> str:
-        available_tools = TOOLS_CONFIG.list_names()
-        return "\n".join(
-            [f"  - {name}: {TOOLS_CONFIG.raw(name).description}" for name in available_tools]
-        )
+    @staticmethod
+    def _safe_json_loads(value: str) -> dict[str, Any] | None:
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+    def _render_markdown_report(
+        self,
+        *,
+        user_request: str,
+        plan: list[AgentCreationTask],
+        results: list[AgentCreationTaskResult],
+    ) -> str:
+        plan_by_id = {task.id: task for task in plan}
+
+        passed_count = sum(1 for r in results if r.passed_qa)
+        failed_count = sum(1 for r in results if not r.passed_qa)
+
+        lines: list[str] = []
+        lines.append("# Agent Scaffolding Result")
+        lines.append("")
+        lines.append("## Summary")
+        lines.append(f"- Total agents: {len(results)}")
+        lines.append(f"- Passed QA: {passed_count}")
+        lines.append(f"- Failed QA: {failed_count}")
+        if user_request:
+            lines.append(f"- User request: {user_request}")
+        lines.append("")
+        lines.append("## Agents")
+
+        if not results:
+            lines.append("")
+            lines.append("_No agent results available._")
+            return "\n".join(lines)
+
+        ordered_results = results
+        if plan_by_id:
+            order_map = {task_id: index for index, task_id in enumerate(plan_by_id)}
+            ordered_results = sorted(
+                results,
+                key=lambda result: order_map.get(result.task_id, len(order_map)),
+            )
+
+        for result in ordered_results:
+            plan_task = plan_by_id.get(result.task_id)
+            parsed = self._safe_json_loads(result.output)
+            agent_id = parsed.get("agent_id") if parsed else None
+            agent_name = parsed.get("agent_name") if parsed else result.name
+            tools = parsed.get("tools") if parsed else None
+            system_prompt = parsed.get("system_prompt") if parsed else None
+            sub_agents = parsed.get("sub_agents") if parsed else None
+
+            lines.append("")
+            lines.append(f"### {agent_name}")
+            lines.append(f"- Status: {'Approved' if result.passed_qa else 'Failed'}")
+            if agent_id:
+                lines.append(f"- Agent ID: {agent_id}")
+            if plan_task:
+                lines.append(f"- Purpose: {plan_task.purpose}")
+                lines.append(f"- Manager: {'Yes' if plan_task.is_manager else 'No'}")
+            if tools is not None:
+                tools_display = ", ".join(tools) if tools else "None"
+                lines.append(f"- Tools: {tools_display}")
+            if sub_agents is not None:
+                sub_agents_display = ", ".join(sub_agents) if sub_agents else "None"
+                lines.append(f"- Sub-agents: {sub_agents_display}")
+            if not result.passed_qa and result.feedback:
+                lines.append(f"- QA feedback: {result.feedback}")
+
+            if system_prompt:
+                lines.append("")
+                lines.append("#### System Prompt")
+                lines.append("```")
+                lines.append(system_prompt)
+                lines.append("```")
+            elif parsed is None:
+                lines.append("")
+                lines.append("#### Raw Output")
+                lines.append("```")
+                lines.append(result.output)
+                lines.append("```")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def _resolve_project_root() -> Path:
+        return Path(__file__).resolve().parents[3]
+
+    def _write_markdown_report(self, markdown: str) -> None:
+        try:
+            report_path = self._resolve_project_root() / "result.md"
+            report_path.write_text(markdown, encoding="utf-8")
+            self.logger.info(f"Markdown report written to {report_path}")
+        except Exception as exc:  # pragma: no cover - fail-safe IO
+            self.logger.error(f"Failed to write markdown report: {exc}")
 
     async def _persist_agent_config(
         self,
@@ -164,27 +269,35 @@ class AgentScaffoldingGraph:
             self.logger.info("Planner agent running...")
 
         planner_agent = self.agents["planner"]
-        tools_info = self._get_available_tools_info()
-
+        allowed_tags = ", ".join(AVAILABLE_TAGS)
         planner_query = f"""User Request: {state.user_request}
         Analyze the user request and create a plan for a multi-agent architecture.
+        You must call the list_all_tools tool to view all tools and their tags. It returns JSON:
+        {{"tools": [{{"name": "<tool_name>", "description": "<tool_description>", "tags": ["<tag>"], "disallowed_tags": ["<tag>"]}}]}}
 
-        Available Tools:
-        {tools_info}
+        Allowed Tags:
+        {allowed_tags}
 
         {f"Previous Plan QA Feedback: {feedback}" if feedback else ""}
+
+        Return a structured response matching the configured schema.
     """
 
-        response = await planner_agent.ask(planner_query)
+        response = await planner_agent.ask_raw(planner_query)
 
         try:
-            plan_data = extract_json_from_response(response)
+            plan_data = self._extract_structured_response(response)
+            if plan_data is None:
+                plan_data = extract_json_from_response(response["messages"][-1].content)
+            else:
+                plan_data = PlannerOutput.model_validate(plan_data).model_dump()
 
             tasks = [
                 AgentCreationTask(
                     id=agent["id"],
                     name=agent["name"],
                     purpose=agent["purpose"],
+                    tags=agent.get("tags", []),
                     is_manager=agent.get("is_manager", False),
                     tools=[],
                     system_prompt="",
@@ -192,13 +305,18 @@ class AgentScaffoldingGraph:
                 for agent in plan_data.get("agents", [])
             ]
 
+            invalid_tags = set()
+            allowed_tags = set(AVAILABLE_TAGS)
+            for task in tasks:
+                invalid_tags.update(tag for tag in task.tags if tag not in allowed_tags)
+            if invalid_tags:
+                raise ValueError(f"Invalid tags found in plan: {sorted(invalid_tags)}")
+
             self.logger.info(f"Generated {len(tasks)} agent task(s).")
             for task in tasks:
                 current_task = task.model_dump()
                 self.logger.debug(f"\t- Task ID: {current_task['id']}:")
-                self.logger.debug(
-                    f"\t\t Name: {current_task['name']}, Purpose: {current_task['purpose']}"
-                )
+                self.logger.debug(f"\t\t Name: {current_task['name']}, Purpose: {current_task['purpose']}")
 
             plan_task = PlanTask(
                 plan=tasks,
@@ -210,16 +328,13 @@ class AgentScaffoldingGraph:
 
             return {"plan_task": plan_task}
 
-        except (json.JSONDecodeError, KeyError) as e:
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
             self.logger.error(f"Failed to parse planner response: {str(e)}")
-            self.logger.error(f"Raw response: {response}")
+            self.logger.error(f"Raw response: {response.get('messages', [])}")
 
             if retry_count == 0:
                 self.logger.warn("First attempt parsing failed. Auto-retrying once...")
-                error_msg = (
-                    f"Previous attempt failed to parse JSON: {str(e)}. "
-                    "Please ensure output is valid JSON."
-                )
+                error_msg = f"Previous attempt failed to parse JSON: {str(e)}. Please ensure output is valid JSON."
                 state.plan_task = PlanTask(
                     plan=[],
                     plan_json="",
@@ -248,10 +363,7 @@ class AgentScaffoldingGraph:
 
         manager_count = sum(1 for task in state.plan_task.plan if task.is_manager)
         if manager_count != 1:
-            feedback = (
-                "Plan must include exactly one manager agent with is_manager=true. "
-                f"Found {manager_count} manager agents."
-            )
+            feedback = f"Plan must include exactly one manager agent with is_manager=true. Found {manager_count} manager agents."
             self.logger.warn(f"Plan QA pre-check failed: {feedback}")
             updated_plan_task = PlanTask(
                 plan=state.plan_task.plan,
@@ -264,22 +376,29 @@ class AgentScaffoldingGraph:
 
         plan_qa_agent = self.agents["plan_qa"]
 
-        qa_prompt = f"""
-        Given Original User Request:
+        qa_prompt = f"""Given Original User Request:
             {state.user_request}
         And Generated Plan:
             {state.plan_task.plan_json}
 
         Perform the review.
+        Use overall_decision with one of: approved, needs_revision.
+        Return a structured response matching the configured schema.
         """
 
-        qa_response = await plan_qa_agent.ask(qa_prompt)
-        self.logger.debug(f"Plan QA response:\n {qa_response}")
+        qa_response = await plan_qa_agent.ask_raw(qa_prompt)
+        self.logger.debug(f"Plan QA response:\n {qa_response.get('messages', [])}")
 
         try:
-            qa_data = extract_json_from_response(qa_response)
+            qa_data = self._extract_structured_response(qa_response)
+            if qa_data is None:
+                qa_data = extract_json_from_response(qa_response["messages"][-1].content)
+            else:
+                qa_data = PlanQAOutput.model_validate(qa_data).model_dump()
             passed = qa_data.get("overall_decision") == "approved"
             feedback = qa_data.get("feedback", "")
+            if not isinstance(feedback, str):
+                feedback = json.dumps(feedback, ensure_ascii=True)
 
             if passed:
                 self.logger.info("Plan QA PASSED")
@@ -315,17 +434,9 @@ class AgentScaffoldingGraph:
         Receives a single task via Send (always as dict).
         """
         state_dict = state.model_dump() if isinstance(state, GraphState) else state
-        plan = [
-            AgentCreationTask(**t) if isinstance(t, dict) else t for t in state_dict.get("plan", [])
-        ]
-        full_plan = [
-            AgentCreationTask(**t) if isinstance(t, dict) else t
-            for t in state_dict.get("full_plan", plan)
-        ]
-        task_results = [
-            AgentCreationTaskResult(**r) if isinstance(r, dict) else r
-            for r in state_dict.get("task_results", [])
-        ]
+        plan = [AgentCreationTask(**t) if isinstance(t, dict) else t for t in state_dict.get("plan", [])]
+        full_plan = [AgentCreationTask(**t) if isinstance(t, dict) else t for t in state_dict.get("full_plan", plan)]
+        task_results = [AgentCreationTaskResult(**r) if isinstance(r, dict) else r for r in state_dict.get("task_results", [])]
         user_request = state_dict.get("user_request", "")
 
         task = plan[0]
@@ -336,29 +447,22 @@ class AgentScaffoldingGraph:
         _, feedback, retry_count = self._find_previous_result(task_results, task_id)
 
         if feedback:
-            self.logger.info(
-                f"RE-GENERATING agent: {task_name} (ID: {task_id}, Attempt #{retry_count + 1})"
-            )
+            self.logger.info(f"RE-GENERATING agent: {task_name} (ID: {task_id}, Attempt #{retry_count + 1})")
             self.logger.warn(f"Previous QA feedback: {feedback}")
         else:
             self.logger.info(f"Generating agent: {task_name} (ID: {task_id})")
 
         agent_generator = self.agents["agent_generator"]
-        tools_info = self._get_available_tools_info()
-
         base_query = f"""Agent Name: {task_name}
 Agent Purpose: {task_purpose}
 User's Original Request: {user_request}
+Agent Tags: {", ".join(task.tags)}
 
-Available Tools:
-{tools_info}"""
+You must call the list_available_tools tool with the agent tags to fetch filtered tools. It returns JSON:
+{{"tools": [{{"name": "<tool_name>", "description": "<tool_description>", "tags": ["<tag>"], "disallowed_tags": ["<tag>"]}}], "filtered_by_tags": ["<tag>"]}}"""
 
         if task.is_manager:
-            sub_agents = [
-                {"id": t.id, "name": t.name, "purpose": t.purpose}
-                for t in full_plan
-                if not t.is_manager
-            ]
+            sub_agents = [{"id": t.id, "name": t.name, "purpose": t.purpose} for t in full_plan if not t.is_manager]
             base_query = f"""{base_query}
 
 Team Context:
@@ -372,18 +476,24 @@ Team Context:
 Previous QA Feedback: {feedback}
 
 Please regenerate the agent configuration addressing the feedback above.
-Return your response as a JSON object with the required structure."""
+Return a structured response matching the configured schema."""
         else:
             generator_query = f"""{base_query}
 
 Please create a complete agent configuration.
-Return your response as a JSON object with the required structure."""
+Return a structured response matching the configured schema."""
 
-        response = await agent_generator.ask(generator_query)
-        self.logger.debug(f"Agent generator response for {task_name}: {response[:200]}")
+        response = await agent_generator.ask_raw(generator_query)
+        raw_messages = response.get("messages", [])
+        if raw_messages:
+            self.logger.debug(f"Agent generator response for {task_name}: {raw_messages[-1].content[:200]}")
 
         try:
-            config_data = extract_json_from_response(response)
+            config_data = self._extract_structured_response(response)
+            if config_data is None:
+                config_data = extract_json_from_response(response["messages"][-1].content)
+            else:
+                config_data = AgentGeneratorOutput.model_validate(config_data).model_dump()
 
             required_fields = ["agent_id", "agent_name", "tools", "system_prompt", "sub_agents"]
             missing_fields = [f for f in required_fields if f not in config_data]
@@ -433,21 +543,14 @@ Return your response as a JSON object with the required structure."""
         Returns TaskResult with passed_qa=True/False and feedback.
         """
         state_dict = state.model_dump() if isinstance(state, GraphState) else state
-        task_results = [
-            AgentCreationTaskResult(**r) if isinstance(r, dict) else r
-            for r in state_dict.get("task_results", [])
-        ]
-        plan = [
-            AgentCreationTask(**t) if isinstance(t, dict) else t for t in state_dict.get("plan", [])
-        ]
+        task_results = [AgentCreationTaskResult(**r) if isinstance(r, dict) else r for r in state_dict.get("task_results", [])]
+        plan = [AgentCreationTask(**t) if isinstance(t, dict) else t for t in state_dict.get("plan", [])]
         user_request = state_dict.get("user_request", "")
 
         result = task_results[0]
         task_id = result.task_id
 
-        self.logger.info(
-            f"QA reviewing agent: {result.name} (ID: {task_id}, Attempt #{result.retry_count + 1})"
-        )
+        self.logger.info(f"QA reviewing agent: {result.name} (ID: {task_id}, Attempt #{result.retry_count + 1})")
 
         qa_agent = self.agents["qa"]
 
@@ -467,11 +570,35 @@ Return your response as a JSON object with the required structure."""
             config_data = json.loads(result.output)
 
             original_task = self._find_task_by_id(plan, task_id)
+            config_tools = config_data.get("tools", [])
 
-            tools_info = self._get_available_tools_info()
+            if original_task and original_task.is_manager and config_tools:
+                feedback = "Manager agent must not use tools directly. Set tools to an empty list for orchestration-only managers."
+                updated_result = AgentCreationTaskResult(
+                    task_id=task_id,
+                    name=result.name,
+                    output=result.output,
+                    passed_qa=False,
+                    feedback=feedback,
+                    retry_count=result.retry_count,
+                )
+                return {"task_results": [updated_result]}
+
+            if original_task and not original_task.tags:
+                feedback = "Agent tags are required and must not be empty."
+                updated_result = AgentCreationTaskResult(
+                    task_id=task_id,
+                    name=result.name,
+                    output=result.output,
+                    passed_qa=False,
+                    feedback=feedback,
+                    retry_count=result.retry_count,
+                )
+                return {"task_results": [updated_result]}
 
             other_agents_context = []
             latest_results = self._get_latest_results(task_results)
+            other_tool_names: set[str] = set()
 
             for other_result in latest_results.values():
                 if other_result.task_id != task_id and not other_result.output.startswith("ERROR:"):
@@ -482,29 +609,72 @@ Return your response as a JSON object with the required structure."""
                         other_purpose = other_task.purpose if other_task else "N/A"
 
                         tools_str = ", ".join(other_tools) if other_tools else "None"
-                        other_agents_context.append(
-                            f"- {other_result.name}: {other_purpose}\n  Tools: {tools_str}"
-                        )
+                        other_agents_context.append(f"- {other_result.name}: {other_purpose}\n  Tools: {tools_str}")
+                        other_tool_names.update(other_tools)
                     except (json.JSONDecodeError, KeyError):
                         continue
 
-            team_context = (
-                "\n".join(other_agents_context)
-                if other_agents_context
-                else "No other agents in the team yet."
-            )
+            if original_task and config_tools:
+                agent_tags = set(original_task.tags)
+                for tool_name in config_tools:
+                    tool_cfg = TOOLS_CONFIG.raw(tool_name)
+                    tool_tags = set(tool_cfg.tags)
+                    disallowed_tags = set(tool_cfg.disallowed_tags)
+
+                    if disallowed_tags.intersection(agent_tags):
+                        feedback = f"Tool tag conflict: '{tool_name}' is disallowed for tags {sorted(disallowed_tags.intersection(agent_tags))}."
+                        updated_result = AgentCreationTaskResult(
+                            task_id=task_id,
+                            name=result.name,
+                            output=result.output,
+                            passed_qa=False,
+                            feedback=feedback,
+                            retry_count=result.retry_count,
+                        )
+                        return {"task_results": [updated_result]}
+
+                    if tool_tags and not tool_tags.intersection(agent_tags):
+                        feedback = f"Tool tag mismatch: '{tool_name}' tags {sorted(tool_tags)} do not overlap agent tags {sorted(agent_tags)}."
+                        updated_result = AgentCreationTaskResult(
+                            task_id=task_id,
+                            name=result.name,
+                            output=result.output,
+                            passed_qa=False,
+                            feedback=feedback,
+                            retry_count=result.retry_count,
+                        )
+                        return {"task_results": [updated_result]}
+
+            if original_task and config_tools and other_tool_names:
+                purpose_lower = original_task.purpose.lower()
+                for tool_name in config_tools:
+                    if tool_name in other_tool_names:
+                        tokens = [token for token in tool_name.lower().split("_") if token]
+                        if tokens and not any(token in purpose_lower for token in tokens):
+                            feedback = (
+                                f"Tool redundancy detected: '{tool_name}' is already used by "
+                                "another agent, and this agent's purpose does not indicate "
+                                "a need for it. Remove the tool or justify with a distinct purpose."
+                            )
+                            updated_result = AgentCreationTaskResult(
+                                task_id=task_id,
+                                name=result.name,
+                                output=result.output,
+                                passed_qa=False,
+                                feedback=feedback,
+                                retry_count=result.retry_count,
+                            )
+                            return {"task_results": [updated_result]}
+
+            team_context = "\n".join(other_agents_context) if other_agents_context else "No other agents in the team yet."
 
             manager_expectations = ""
             if original_task and original_task.is_manager:
-                expected_subagents = [
-                    {"id": t.id, "name": t.name, "purpose": t.purpose}
-                    for t in plan
-                    if not t.is_manager
-                ]
+                expected_subagents = [t.id for t in plan if not t.is_manager]
                 manager_expectations = f"""
 Manager Requirements:
 - This agent is the manager and must include sub_agents for all non-manager agents.
-- Expected sub_agents list:
+- Expected sub_agents list (ids only):
 {json.dumps(expected_subagents, indent=2)}
 """
 
@@ -514,27 +684,38 @@ Agent Under Review:
 - Name: {result.name}
 - Purpose: {original_task.purpose if original_task else "N/A"}
 - Is Manager: {original_task.is_manager if original_task else False}
+- Tags: {", ".join(original_task.tags) if original_task else "N/A"}
 
 Other Agents in the Team:
 {team_context}
 
-Available Tools in System:
-{tools_info}
+You must call the list_all_tools tool to fetch available tools and their tags. It returns JSON:
+{{"tools": [{{"name": "<tool_name>", "description": "<tool_description>", "tags": ["<tag>"], "disallowed_tags": ["<tag>"]}}]}}
 
 {manager_expectations}
 
 Generated Configuration for {result.name}:
 {json.dumps(config_data, indent=2)}
 
-Please review this agent configuration and provide an audit report."""
+Please review this agent configuration and provide an audit report.
+Use overall_decision with one of: approved, needs_revision.
+Return a structured response matching the configured schema."""
 
-            qa_response = await qa_agent.ask(qa_query)
-            self.logger.debug(f"QA response for {result.name}: {qa_response[:200]}")
+            qa_response = await qa_agent.ask_raw(qa_query)
+            raw_messages = qa_response.get("messages", [])
+            if raw_messages:
+                self.logger.debug(f"QA response for {result.name}: {raw_messages[-1]}")
 
-            qa_data = extract_json_from_response(qa_response)
+            qa_data = self._extract_structured_response(qa_response)
+            if qa_data is None:
+                qa_data = extract_json_from_response(qa_response["messages"][-1].content)
+            else:
+                qa_data = AgentQAOutput.model_validate(qa_data).model_dump()
 
             passed = qa_data.get("overall_decision") == "approved"
             feedback = qa_data.get("feedback", "")
+            if not isinstance(feedback, str):
+                feedback = json.dumps(feedback, ensure_ascii=True)
 
             if passed:
                 self.logger.info(f"QA PASSED for {result.name}")
@@ -585,21 +766,15 @@ Please review this agent configuration and provide an audit report."""
             return "agent_generator"
 
         if state.plan_task.retry_count < MAX_RETRIES:
-            self.logger.warn(
-                f"Plan QA failed (attempt #{state.plan_task.retry_count + 1}). Retrying planner..."
-            )
+            self.logger.warn(f"Plan QA failed (attempt #{state.plan_task.retry_count + 1}). Retrying planner...")
             return "planner"
         else:
-            self.logger.error(
-                f"Plan QA failed after {MAX_RETRIES} retries. Proceeding with current plan anyway.."
-            )
+            self.logger.error(f"Plan QA failed after {MAX_RETRIES} retries. Proceeding with current plan anyway..")
             return "agent_generator"
 
     async def _qa_review_barrier(self, state: GraphState) -> dict[str, Any]:  # noqa: ARG001
         latest_results = self._get_latest_results(state.task_results)
-        self.logger.debug(
-            f"QA review - all {len(latest_results)} QA nodes completed, proceeding to routing"
-        )
+        self.logger.debug(f"QA review - all {len(latest_results)} QA nodes completed, proceeding to routing")
         return {}
 
     def _route_qa_results(self, state: GraphState) -> list[Send] | str:
@@ -615,9 +790,7 @@ Please review this agent configuration and provide an audit report."""
         passed = [r for r in results if r.passed_qa]
         failed = [r for r in results if not r.passed_qa]
 
-        self.logger.info(
-            f"[ROUTING] Total: {len(results)}, Passed: {len(passed)}, Failed: {len(failed)}"
-        )
+        self.logger.info(f"[ROUTING] Total: {len(results)}, Passed: {len(passed)}, Failed: {len(failed)}")
         for r in results:
             self.logger.debug(f"  - {r.name}: passed={r.passed_qa}, retry_count={r.retry_count}")
 
@@ -625,10 +798,7 @@ Please review this agent configuration and provide an audit report."""
             retriable = [r for r in failed if r.retry_count < MAX_RETRIES]
 
             if retriable:
-                self.logger.info(
-                    f"Routing {len(retriable)} failed agents back to generator (retrying). "
-                    f"{len(passed)} agents already passed and won't be retried."
-                )
+                self.logger.info(f"Routing {len(retriable)} failed agents back to generator (retrying). {len(passed)} agents already passed and won't be retried.")
 
                 if not state.plan_task or not state.plan_task.plan:
                     self.logger.error("No plan available for retry")
@@ -638,9 +808,7 @@ Please review this agent configuration and provide an audit report."""
                 for r in retriable:
                     original_task = self._find_task_by_id(state.plan_task.plan, r.task_id)
                     if not original_task:
-                        self.logger.error(
-                            f"Could not find original task for {r.task_id}, skipping retry"
-                        )
+                        self.logger.error(f"Could not find original task for {r.task_id}, skipping retry")
                         continue
 
                     retry_sends.append(
@@ -738,10 +906,7 @@ Please review this agent configuration and provide an audit report."""
 
                 for task in state.plan_task.plan:
                     if not task.id or not task.name or not task.purpose:
-                        self.logger.error(
-                            f"Invalid task in plan: id={task.id}, name={task.name}, "
-                            f"purpose={task.purpose}"
-                        )
+                        self.logger.error(f"Invalid task in plan: id={task.id}, name={task.name}, purpose={task.purpose}")
                         return "aggregator"
 
                 return [
@@ -767,10 +932,7 @@ Please review this agent configuration and provide an audit report."""
             all_latest = self._get_latest_results(state.task_results)
             already_passed = len(all_latest) - len(pending_review)
 
-            self.logger.info(
-                f"[DISPATCH_QA] Dispatching {len(pending_review)} results to QA "
-                f"({already_passed} already passed)"
-            )
+            self.logger.info(f"[DISPATCH_QA] Dispatching {len(pending_review)} results to QA ({already_passed} already passed)")
             for r in pending_review:
                 self.logger.debug(f"  - {r.name} (retry_count={r.retry_count})")
 
@@ -834,5 +996,12 @@ Please review this agent configuration and provide an audit report."""
         self.logger.info(f"Total agents: {len(all_results)}")
         self.logger.info(f"Passed QA: {sum(1 for r in all_results if r.passed_qa)}")
         self.logger.info(f"Failed QA: {sum(1 for r in all_results if not r.passed_qa)}")
+
+        markdown_report = self._render_markdown_report(
+            user_request=self._team_user_request,
+            plan=final_state.plan_task.plan if final_state.plan_task else [],
+            results=all_results,
+        )
+        self._write_markdown_report(markdown_report)
 
         return result["final_output"]

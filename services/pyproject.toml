@@ -50,10 +50,23 @@ dev = [
 ]
 
 [tool.ruff]
-line-length = 100
 target-version = "py313"
 src = ["ai_gateway"]
+line-length = 200
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
 ignore = []
+
+[tool.ty.src]
+include = ["ai_gateway", "data_portal"]
+exclude = [
+  "**/__pycache__/**",
+  "**/.pytest_cache/**",
+  "**/.ruff_cache/**",
+  "**/.mypy_cache/**",
+  "**/.venv/**",
+  "**/build/**",
+  "**/dist/**",
+  "**/node_modules/**",
+]

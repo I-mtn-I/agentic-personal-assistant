@@ -10,13 +10,13 @@ All functions raise descriptive errors if files are missing or malformed.
 
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, Optional
+from typing import Any, Callable, Dict, Iterator, Literal, Optional
 
 import yaml
 from dotenv import load_dotenv
 from llama_index.core import Settings
 from llama_index.embeddings.ollama import OllamaEmbedding
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # --------------------------------------------------------------------------- #
@@ -45,10 +45,39 @@ class AppConfig(BaseSettings):
     QDRANT_PORT: str
     LLM_HOST: str
     LLM_MODEL: str
+    LLM_MODEL_SMALL: str | None = None
+    LLM_MODEL_MEDIUM: str | None = None
+    LLM_MODEL_LARGE: str | None = None
     LLM_EMBED_MODEL: str
 
-    model_config = SettingsConfigDict(env_file=str(ENV_PATH), env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=str(ENV_PATH),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
+
+# --------------------------------------------------------------------------- #
+# Tags
+# --------------------------------------------------------------------------- #
+AVAILABLE_TAGS = [
+    "admin",
+    "analysis",
+    "data",
+    "db",
+    "manager",
+    "meta",
+    "orchestration",
+    "planning",
+    "report",
+    "research",
+    "search",
+    "support",
+    "summary",
+    "time",
+    "tools",
+    "web",
+]
 
 # --------------------------------------------------------------------------- #
 # Pydantic models for the config files
@@ -60,6 +89,15 @@ class BaseToolConfig(BaseModel):
     target: str
     # short description to help the agent when to use the tool.
     description: str
+    tags: list[str] = Field(default_factory=list)
+    disallowed_tags: list[str] = Field(default_factory=list)
+
+    @field_validator("tags")
+    @classmethod
+    def _validate_tags(cls, value: list[str]) -> list[str]:
+        if not value:
+            raise ValueError("Tool tags must not be empty")
+        return value
 
 
 class ToolConfigNamespace:
@@ -82,9 +120,7 @@ class ToolConfigNamespace:
             raise AttributeError(f"No such tool: {name}")
 
         if name not in self._cache:
-            self._cache[name] = (
-                self._builder(name, self._raw[name]) if self._builder else self._raw[name]
-            )
+            self._cache[name] = self._builder(name, self._raw[name]) if self._builder else self._raw[name]
         return self._cache[name]
 
     def __getitem__(self, name: str) -> Any:
@@ -107,6 +143,14 @@ class BaseAgentConfig(BaseModel):
     streaming: bool
     prompt: str
     tools: list[str] | None = None
+    model_size: Literal["small", "medium", "large"] | None = Field(
+        default=None,
+        description="Model size override: small, medium, or large",
+    )
+    tags: list[str] | None = Field(
+        default=None,
+        description="Optional tags for static agents",
+    )
 
 
 class AgentConfigNamespace:

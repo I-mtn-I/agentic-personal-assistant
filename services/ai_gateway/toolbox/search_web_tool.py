@@ -2,86 +2,15 @@ import json
 import logging
 import re
 
-import requests
-import trafilatura
-from bs4 import BeautifulSoup
 from langchain.tools import tool
-from pydantic import BaseModel
 
 from ai_gateway.domain import AgentFactory
+from ai_gateway.toolbox.web_page_helper_tools import (
+    duckduckgo_search,
+    page_scrap,
+)
 
-# Constants
-MAX_RESULTS = 10
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
-    )
-}
-
-
-class SearchResults(BaseModel):
-    id: int
-    url: str
-    title: str
-    result_snippet: str
-
-
-def duckduckgo_search(query: str) -> list[SearchResults]:
-    # Clean up the query string
-    if query[0] == '"':
-        query = query[1:-1]
-    if query.startswith("NEWS:"):
-        query = query[len("NEWS:") :] + "&iar=news"
-    if query[0] == " ":
-        query = query[1:]
-    query = query.replace(" ", "+")
-
-    # Construct the search URL
-    url = f"https://html.duckduckgo.com/html/?q={query}"
-
-    try:
-        response = requests.get(url, headers=HEADERS)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Request failed: {e}")
-        return []
-
-    soup = BeautifulSoup(response.text, "html.parser")
-    results: list[SearchResults] = []
-
-    for i, result in enumerate(soup.find_all("div", class_="result"), start=1):
-        if i > MAX_RESULTS:
-            break
-
-        title_tag = result.find("a", class_="result__a")
-        if not title_tag:
-            continue
-
-        link = str(title_tag["href"])  # Extract link
-        title = title_tag.text  # Extract title
-        snippet_tag = result.find("a", class_="result__snippet")
-        snippet = (
-            str(snippet_tag.text.strip()) if snippet_tag else "No description available"
-        )  # Extract short text under link
-
-        results.append(SearchResults(id=i, url=link, title=title, result_snippet=snippet))
-
-    return results
-
-
-@tool(description="Useful to gather content of a web page")
-def page_scrap(url: str) -> str:
-    try:
-        downloaded = trafilatura.fetch_url(url=url)
-        content = trafilatura.extract(downloaded, include_formatting=True, include_links=True)
-        if content:
-            return content
-        else:
-            return "Nothing found"
-    except Exception as e:
-        print(f"Failed to extract content from website. Error: {e}")
-        return ""
+page_scrap_tool = tool(description="Useful to gather content of a web page")(page_scrap)
 
 
 # create agents
@@ -147,8 +76,21 @@ summary_assistant = AgentFactory.build_agent(
     Output Format (must follow same format):
     markdown summary of the page content
     """,
-    tools=[page_scrap],
+    tools=[page_scrap_tool],
 )
+
+
+def _parse_best_result_index(response_text: str, result_count: int) -> int:
+    if result_count <= 0:
+        return 0
+    candidates = [int(match) for match in re.findall(r"-?\d+", response_text)]
+    for value in candidates:
+        if 0 <= value < result_count:
+            return value
+    for value in candidates:
+        if 1 <= value <= result_count:
+            return value - 1
+    return 0
 
 
 async def search_web(query: str) -> str:
@@ -169,25 +111,12 @@ async def search_web(query: str) -> str:
                 for result in search_results
             ],
         }
-        results_str = json.dumps(results_payload, ensure_ascii=True)
-        best_result_raw = await best_result_chooser.ask(results_str)  # Get best result
-        chosen_index = _parse_best_result_index(best_result_raw, len(search_results))
-        choosen_link = search_results[chosen_index].url  # Extract chosen URL
-        summary = await summary_assistant.ask(choosen_link)  # Get summary
+        results_str: str = json.dumps(results_payload, ensure_ascii=True)
+        best_result_raw: str = await best_result_chooser.ask(results_str)  # Get best result
+        chosen_index: int = _parse_best_result_index(best_result_raw, len(search_results))
+        choosen_link: str = search_results[chosen_index].url  # Extract chosen URL
+        summary: str = await summary_assistant.ask(choosen_link)  # Get summary
         return summary
     except Exception as e:
         logging.error(f"An error occurred during web search: {e}")  # Log the error
         return "An error occurred while processing your request."
-
-
-def _parse_best_result_index(response_text: str, result_count: int) -> int:
-    if result_count <= 0:
-        return 0
-    candidates = [int(match) for match in re.findall(r"-?\d+", response_text)]
-    for value in candidates:
-        if 0 <= value < result_count:
-            return value
-    for value in candidates:
-        if 1 <= value <= result_count:
-            return value - 1
-    return 0

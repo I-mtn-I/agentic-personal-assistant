@@ -82,9 +82,7 @@ class ColoredLogger:
         self._fmt = fmt
         self._time_format = time_format
         # Default formatter uses ``str.format``; callers may inject any callable
-        self._formatter: Callable[[str, Any], str] = (
-            formatter if formatter is not None else lambda f, *a, **kw: f.format(*a, **kw)
-        )
+        self._formatter: Callable[[str, Any], str] = formatter if formatter is not None else lambda f, *a, **kw: f.format(*a, **kw)
 
     # ------------------------------------------------------------------
     # Public API – one method per log level

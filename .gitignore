@@ -14,6 +14,8 @@ list/
 
 # IDE
 *.code-workspace
+.vscode/**
+.vscode/
 
 # OS
 .DS_Store
@@ -23,3 +25,6 @@ list/
 
 # AI Stuff
 .continue/
+
+# Generated files
+result.md

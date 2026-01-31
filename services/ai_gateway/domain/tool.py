@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, Literal, Optional
 
-from langchain.tools import tool as lc_tool  # pyright: ignore
+from langchain.tools import tool as lc_tool
 from langchain_core.tools import ArgsSchema, BaseTool
 
 
@@ -39,7 +39,7 @@ class Tool:
         error_on_invalid_docstring: Optional[bool] = True,
     ) -> None:
         self.description = description
-        self.target = target  # pyright: ignore
+        self.target = target
         self.return_direct = return_direct
         self.args_schema = args_schema
         self.infer_schema = infer_schema
@@ -56,7 +56,7 @@ class Tool:
         Aimed to be consumed by ```built-in-factory``` only.
         """
         tool_kwargs: Dict[str, Any] = {
-            "name_or_callable": self.target,  # pyright: ignore
+            "name_or_callable": self.target,
             "description": self.description,
             "return_direct": self.return_direct,
             "args_schema": self.args_schema,

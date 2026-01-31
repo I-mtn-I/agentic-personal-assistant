@@ -2,16 +2,24 @@
 import importlib
 from typing import Callable, Dict, List, Optional
 
+from langchain.agents.structured_output import ToolStrategy
 from langchain_core.tools import BaseTool
 
 from ai_gateway.config.settings import (
     AGENTS_CONFIG,
+    APP_CONFIG,
     TOOLS_CONFIG,
     AgentConfigNamespace,
     BaseAgentConfig,
     ToolConfigNamespace,
 )
 from ai_gateway.domain.agent import Agent
+from ai_gateway.domain.scaffolding_models import (
+    AgentGeneratorOutput,
+    AgentQAOutput,
+    PlannerOutput,
+    PlanQAOutput,
+)
 from ai_gateway.domain.tool import create_tool_from_callable
 
 
@@ -39,10 +47,8 @@ class ToolFactory:
         tools_dict: Dict[str, BaseTool] = {}
         for name, cfg in TOOLS_CONFIG._raw.items():
             # ``cfg`` is a BaseToolConfig (target is a string)
-            callable_obj = ToolFactory._resolve_tool_callable(cfg.target)  # pyright: ignore
-            tools_dict[name] = ToolFactory.build_tool(  # pyright: ignore
-                target=callable_obj, description=cfg.description
-            )
+            callable_obj = ToolFactory._resolve_tool_callable(cfg.target)
+            tools_dict[name] = ToolFactory.build_tool(target=callable_obj, description=cfg.description)
         return ToolConfigNamespace(tools_dict)
 
     @staticmethod
@@ -75,6 +81,24 @@ class AgentFactory:
                 # ``tool_name`` refers to the key in tools.yaml
                 tool_objs.append(ToolFactory.get_tool_by_name(tool_name))
 
+        response_format = None
+        if name == "planner":
+            response_format = ToolStrategy(PlannerOutput)
+        elif name == "plan_qa":
+            response_format = ToolStrategy(PlanQAOutput)
+        elif name == "agent_generator":
+            response_format = ToolStrategy(AgentGeneratorOutput)
+        elif name == "qa":
+            response_format = ToolStrategy(AgentQAOutput)
+
+        model_name = None
+        if cfg.model_size == "small":
+            model_name = APP_CONFIG.LLM_MODEL_SMALL or APP_CONFIG.LLM_MODEL
+        elif cfg.model_size == "medium":
+            model_name = APP_CONFIG.LLM_MODEL_MEDIUM or APP_CONFIG.LLM_MODEL
+        elif cfg.model_size == "large":
+            model_name = APP_CONFIG.LLM_MODEL_LARGE or APP_CONFIG.LLM_MODEL
+
         return Agent(
             name=name,
             prompt=cfg.prompt,
@@ -83,6 +107,8 @@ class AgentFactory:
             state_schema=None,
             context_schema={},
             checkpointer=None,
+            response_format=response_format,
+            model_name=model_name,
         ).create_agent()
 
     @staticmethod

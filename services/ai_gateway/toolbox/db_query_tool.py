@@ -5,12 +5,7 @@ from llama_index.llms.ollama import Ollama
 
 from ai_gateway.config import APP_CONFIG
 
-pg_db = SQLDatabase.from_uri(  # pyright: ignore
-    (
-        f"postgresql://{APP_CONFIG.POSTGRES_USER}:{APP_CONFIG.POSTGRES_PASSWORD}"
-        f"@{APP_CONFIG.POSTGRES_HOST}:{APP_CONFIG.POSTGRES_PORT}/{APP_CONFIG.POSTGRES_DB}"
-    )
-)
+pg_db = SQLDatabase.from_uri((f"postgresql://{APP_CONFIG.POSTGRES_USER}:{APP_CONFIG.POSTGRES_PASSWORD}@{APP_CONFIG.POSTGRES_HOST}:{APP_CONFIG.POSTGRES_PORT}/{APP_CONFIG.POSTGRES_DB}"))
 
 llm = Ollama(model=APP_CONFIG.LLM_MODEL, base_url=APP_CONFIG.LLM_HOST)
 embed_model = OllamaEmbedding(

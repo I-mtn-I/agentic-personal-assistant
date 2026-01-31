@@ -22,6 +22,10 @@ class Agent:
     :type tools: Optional[list[Any]]
     :param middleware: Middleware configurations for the agent. Defaults to None.
     :type middleware: Optional[list[Any]]
+    :param response_format: Structured response format for the agent. Defaults to None.
+    :type response_format: Optional[Any]
+    :param model_name: Model name override for the agent. Defaults to None.
+    :type model_name: Optional[str]
     :param state_schema: Schema for the agent's state. Defaults to None.
     :type state_schema: Optional[Any]
     :param context_schema: Schema for the agent's context. Defaults to an empty dictionary.
@@ -39,6 +43,8 @@ class Agent:
         state_schema: Optional[Any] = None,
         context_schema: Optional[Dict[str, Any]] = None,
         checkpointer: Optional[Any] = None,
+        response_format: Optional[Any] = None,
+        model_name: Optional[str] = None,
     ) -> None:
         self.name = name
         self.prompt = prompt
@@ -47,11 +53,13 @@ class Agent:
         self.state_schema = state_schema
         self.context_schema = context_schema if context_schema else {}
         self.checkpointer = checkpointer
+        self.response_format = response_format
+        self.model_name = model_name
         self.agent: Optional[CompiledStateGraph[Any, None, Any, Any]] = None
 
     def create_agent(self) -> "Agent":
         _model = ChatOllama(
-            model=getattr(APP_CONFIG, "LLM_MODEL", ""),
+            model=self.model_name or getattr(APP_CONFIG, "LLM_MODEL", ""),
             base_url=getattr(APP_CONFIG, "LLM_HOST", None),
         )
 
@@ -66,6 +74,8 @@ class Agent:
             "checkpointer": self.checkpointer,
             # "debug": True,
         }
+        if self.response_format is not None:
+            agent_kwargs["response_format"] = self.response_format
         self.agent = lc_agent(**agent_kwargs)
 
         return self
@@ -75,17 +85,29 @@ class Agent:
         Send a user query to the built agent and return the final response text.
         """
         if self.agent is None:
-            raise RuntimeError(
-                "Agent not initialised - call ``create_agent()`` before ``invoke()``."
-            )
+            raise RuntimeError("Agent not initialised - call ``create_agent()`` before ``invoke()``.")
 
-        response = await self.agent.ainvoke(  # pyright: ignore
+        response = await self.agent.ainvoke(
             {
                 "messages": [{"role": "user", "content": query}],
             }
         )
         # ``response`` follows the LangGraph schema; the last message holds the answer.
         return response["messages"][-1].content
+
+    async def ask_raw(self, query: str) -> dict[str, Any]:
+        """
+        Send a user query to the built agent and return the full response payload.
+        """
+        if self.agent is None:
+            raise RuntimeError("Agent not initialised - call ``create_agent()`` before ``invoke()``.")
+
+        response = await self.agent.ainvoke(
+            {
+                "messages": [{"role": "user", "content": query}],
+            }
+        )
+        return response
 
     def get_agent_as_tool(self, description: str) -> BaseTool:
         """
@@ -101,15 +123,12 @@ class Agent:
             query: str = Field(description="The query to pass to the agent")
 
         @tool(args_schema=AgentInput)
-        def agent_tool(query: str) -> str:
+        async def agent_tool(query: str) -> str:
             """Call the agent to handle specialized tasks."""
             if self.agent:
-                response = self.agent.invoke({"messages": [{"role": "user", "content": query}]})  # pyright: ignore
+                response = await self.agent.ainvoke({"messages": [{"role": "user", "content": query}]})
                 return response["messages"][-1].content
-            else:
-                raise ValueError(
-                    "No agent found, did you forget to create it? (Agent.create_agent)"
-                )
+            raise ValueError("No agent found, did you forget to create it? (Agent.create_agent)")
 
         agent_tool.name = f"{self.name}_tool"
         agent_tool.description = f"{description}"

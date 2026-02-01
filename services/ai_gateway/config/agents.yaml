@@ -28,7 +28,7 @@
 
 # ------ Hotel Reception agents to test tool ---------
 # reception_supervisor:
-#   streaming: False
+#   streaming: True
 #   prompt: >
 #     You are the supervisor at the frontdesk of Hotel Hilton.
 #     You are responsible of all reception operations.
@@ -52,7 +52,7 @@
 #     - Follow Hilton’s standard operating procedures for all actions.
 
 # it:
-#   streaming: False
+#   streaming: True
 #   tools: [generate_wifi_pass]
 #   prompt: >
 #     You are an IT specialist of the Hilton Hotel supporting the front desk
@@ -75,7 +75,7 @@
 
 # ------- Web search agent to test tool ----------------
 # researcher:
-#   streaming: False
+#   streaming: True
 #   tools: [search_web, current_datetime]
 #   prompt: >
 #     You are a research agent.
@@ -104,7 +104,7 @@
 # ------------------- AGENT SCAFFOLDING --------------------
 
 planner:
-  streaming: False
+  streaming: True
   tools: [list_all_tools]
   model_size: medium
   prompt: >
@@ -155,7 +155,7 @@ planner:
     Return a structured response matching the configured schema.
 
 agent_generator:
-  streaming: False
+  streaming: True
   tools: [list_available_tools]
   model_size: medium
   prompt: >
@@ -202,11 +202,13 @@ agent_generator:
     - The system_prompt must match the template provided above.
     - The system_prompt must include information about the tools that will be used (in the background section).
     - The system_prompt must NOT include negative statements about tools (i.e: 'don't use other tools')
-    - If the agent is a manager, it must not use tools directly; set "tools" to an empty list.
+    - If the agent is a manager, it can only use current_datetime tool. No other tools are allowed.
     - If the agent is the manager, include a "sub_agents" list in the output with all sub-agent ids you were provided.
     - If the agent is not the manager, set "sub_agents" to an empty list.
     - An agent can have zero or more tools.
     - An agent must never have a tool that it'll not use.
+    - An agent must have current_datetime tool for time related or research related tasks.
+    - If an agent has the current_datetime tool, it must be made aware in the prompt that it should use it to know current date.
     - If an agent has no tools, set "tools" to an empty list.
     - When revising based on feedback, only select tools from the list returned by list_available_tools.
     - Only select tools whose tags overlap the agent tags and do not include the agent tags in disallowed_tags.
@@ -216,7 +218,7 @@ agent_generator:
     Return a structured response matching the configured schema.
 
 plan_qa:
-  streaming: False
+  streaming: True
   tools: [list_all_tools]
   model_size: medium
   prompt: >
@@ -262,7 +264,7 @@ plan_qa:
     Return a structured response matching the configured schema.
 
 qa:
-  streaming: False
+  streaming: True
   tools: [list_all_tools]
   model_size: medium
   prompt: >
@@ -322,7 +324,7 @@ qa:
 
 ### FAILED ATTEMPTS BELOW: but deep agent was a good idea.
 # configuration_manager:
-#   streaming: False
+#   streaming: True
 #   tools: []
 #   prompt: >
 #     You are configuration_manager: an expert prompt engineer for building deep agents and subagents.

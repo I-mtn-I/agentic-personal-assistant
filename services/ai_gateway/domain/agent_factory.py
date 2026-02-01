@@ -21,6 +21,7 @@ from ai_gateway.domain.scaffolding_models import (
     PlanQAOutput,
 )
 from ai_gateway.domain.tool import create_tool_from_callable
+from ai_gateway.utils.streaming import build_streaming_session
 
 
 class ToolFactory:
@@ -106,6 +107,9 @@ class AgentFactory:
         elif cfg.model_size == "large":
             model_name = APP_CONFIG.LLM_MODEL_LARGE or APP_CONFIG.LLM_MODEL
 
+        stream_session = build_streaming_session(name, is_subagent=False) if cfg.streaming else None
+        callbacks = stream_session.callbacks if stream_session else None
+
         return Agent(
             name=name,
             prompt=cfg.prompt,
@@ -116,7 +120,7 @@ class AgentFactory:
             checkpointer=None,
             response_format=response_format,
             model_name=model_name,
-        ).create_agent()
+        ).create_agent(streaming=cfg.streaming, callbacks=callbacks)
 
     @staticmethod
     def generate_default_agents() -> AgentConfigNamespace:

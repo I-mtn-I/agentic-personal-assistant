@@ -1,7 +1,9 @@
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from langchain.agents import create_agent as lc_agent
 from langchain.tools import BaseTool, tool
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_ollama import ChatOllama
 from langgraph.graph.state import CompiledStateGraph
@@ -91,6 +93,14 @@ class Agent:
             return None
         return {"callbacks": self.callbacks}
 
+    @staticmethod
+    def _build_messages(query: str) -> list[Any]:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return [
+            SystemMessage(content=f"Current time (UTC): {now_iso}"),
+            HumanMessage(content=query),
+        ]
+
     async def ask(self, query: str) -> str:
         """
         Send a user query to the built agent and return the final response text.
@@ -99,12 +109,7 @@ class Agent:
             raise RuntimeError("Agent not initialised - call ``create_agent()`` before ``invoke()``.")
 
         config = self._build_runnable_config()
-        response = await self.agent.ainvoke(
-            {
-                "messages": [{"role": "user", "content": query}],
-            },
-            config=config,
-        )
+        response = await self.agent.ainvoke({"messages": self._build_messages(query)}, config=config)
         # ``response`` follows the LangGraph schema; the last message holds the answer.
         return response["messages"][-1].content
 
@@ -116,12 +121,7 @@ class Agent:
             raise RuntimeError("Agent not initialised - call ``create_agent()`` before ``invoke()``.")
 
         config = self._build_runnable_config()
-        response = await self.agent.ainvoke(
-            {
-                "messages": [{"role": "user", "content": query}],
-            },
-            config=config,
-        )
+        response = await self.agent.ainvoke({"messages": self._build_messages(query)}, config=config)
         return response
 
     def get_agent_as_tool(self, description: str) -> BaseTool:
@@ -143,7 +143,7 @@ class Agent:
             if self.agent:
                 config = self._build_runnable_config()
                 response = await self.agent.ainvoke(
-                    {"messages": [{"role": "user", "content": query}]},
+                    {"messages": self._build_messages(query)},
                     config=config,
                 )
                 return response["messages"][-1].content

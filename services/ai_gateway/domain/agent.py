@@ -2,6 +2,7 @@ from typing import Any, Dict, Optional
 
 from langchain.agents import create_agent as lc_agent
 from langchain.tools import BaseTool, tool
+from langchain_core.runnables import RunnableConfig
 from langchain_ollama import ChatOllama
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field
@@ -55,12 +56,17 @@ class Agent:
         self.checkpointer = checkpointer
         self.response_format = response_format
         self.model_name = model_name
+        self.streaming = False
+        self.callbacks: Optional[list[Any]] = None
         self.agent: Optional[CompiledStateGraph[Any, None, Any, Any]] = None
 
-    def create_agent(self) -> "Agent":
+    def create_agent(self, *, streaming: bool = False, callbacks: Optional[list[Any]] = None) -> "Agent":
+        self.streaming = streaming
+        self.callbacks = callbacks
         _model = ChatOllama(
             model=self.model_name or getattr(APP_CONFIG, "LLM_MODEL", ""),
             base_url=getattr(APP_CONFIG, "LLM_HOST", None),
+            callbacks=callbacks,
         )
 
         agent_kwargs: Dict[str, Any] = {
@@ -80,6 +86,11 @@ class Agent:
 
         return self
 
+    def _build_runnable_config(self) -> RunnableConfig | None:
+        if not self.callbacks:
+            return None
+        return {"callbacks": self.callbacks}
+
     async def ask(self, query: str) -> str:
         """
         Send a user query to the built agent and return the final response text.
@@ -87,10 +98,12 @@ class Agent:
         if self.agent is None:
             raise RuntimeError("Agent not initialised - call ``create_agent()`` before ``invoke()``.")
 
+        config = self._build_runnable_config()
         response = await self.agent.ainvoke(
             {
                 "messages": [{"role": "user", "content": query}],
-            }
+            },
+            config=config,
         )
         # ``response`` follows the LangGraph schema; the last message holds the answer.
         return response["messages"][-1].content
@@ -102,10 +115,12 @@ class Agent:
         if self.agent is None:
             raise RuntimeError("Agent not initialised - call ``create_agent()`` before ``invoke()``.")
 
+        config = self._build_runnable_config()
         response = await self.agent.ainvoke(
             {
                 "messages": [{"role": "user", "content": query}],
-            }
+            },
+            config=config,
         )
         return response
 
@@ -126,7 +141,11 @@ class Agent:
         async def agent_tool(query: str) -> str:
             """Call the agent to handle specialized tasks."""
             if self.agent:
-                response = await self.agent.ainvoke({"messages": [{"role": "user", "content": query}]})
+                config = self._build_runnable_config()
+                response = await self.agent.ainvoke(
+                    {"messages": [{"role": "user", "content": query}]},
+                    config=config,
+                )
                 return response["messages"][-1].content
             raise ValueError("No agent found, did you forget to create it? (Agent.create_agent)")
 
@@ -135,7 +154,14 @@ class Agent:
 
         return agent_tool
 
-    def extend_agent_with_subagent(self, sub_agent: "Agent", description: str) -> "Agent":
+    def extend_agent_with_subagent(
+        self,
+        sub_agent: "Agent",
+        description: str,
+        *,
+        streaming: bool = False,
+        callbacks: Optional[list[Any]] = None,
+    ) -> "Agent":
         """
         Extend an existing agent with a sub-agent.
         Provided sub agent will be converted as a tool and added to the root agent.
@@ -155,4 +181,4 @@ class Agent:
             state_schema=None,
             context_schema={},
             checkpointer=None,
-        ).create_agent()
+        ).create_agent(streaming=streaming, callbacks=callbacks)

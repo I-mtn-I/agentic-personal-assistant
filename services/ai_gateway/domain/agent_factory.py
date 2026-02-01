@@ -63,11 +63,18 @@ class AgentFactory:
     """
 
     @staticmethod
-    def build_agent(name: str, prompt: str, tools: Optional[List[BaseTool]] = None):
+    def build_agent(
+        name: str,
+        prompt: str,
+        tools: Optional[List[BaseTool]] = None,
+        *,
+        streaming: bool = False,
+        callbacks: Optional[List] = None,
+    ):
         """
         Build basic agent with name, prompt and tools
         """
-        return Agent(name=name, prompt=prompt, tools=tools).create_agent()
+        return Agent(name=name, prompt=prompt, tools=tools).create_agent(streaming=streaming, callbacks=callbacks)
 
     @staticmethod
     def _build_agent_from_config(name: str, cfg: BaseAgentConfig) -> Agent:

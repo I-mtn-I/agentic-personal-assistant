@@ -1,6 +1,6 @@
 # factory.py
 import importlib
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from langchain.agents.structured_output import ToolStrategy
 from langchain_core.tools import BaseTool
@@ -16,9 +16,9 @@ from ai_gateway.config.settings import (
 from ai_gateway.domain.agent import Agent
 from ai_gateway.domain.scaffolding_models import (
     AgentGeneratorOutput,
-    AgentQAOutput,
     PlannerOutput,
     PlanQAOutput,
+    TeamQAOutput,
 )
 from ai_gateway.domain.tool import create_tool_from_callable
 from ai_gateway.utils.streaming import build_streaming_session
@@ -78,6 +78,29 @@ class AgentFactory:
         return Agent(name=name, prompt=prompt, tools=tools).create_agent(streaming=streaming, callbacks=callbacks)
 
     @staticmethod
+    def build_deep_agent(
+        name: str,
+        prompt: str,
+        tools: Optional[List[BaseTool]] = None,
+        *,
+        subagents: Optional[List[dict]] = None,
+        streaming: bool = False,
+        callbacks: Optional[List] = None,
+        response_format: Optional[Any] = None,
+        model_name: Optional[str] = None,
+    ):
+        """
+        Build deep agent with name, prompt, tools, and optional subagents.
+        """
+        return Agent(
+            name=name,
+            prompt=prompt,
+            tools=tools,
+            response_format=response_format,
+            model_name=model_name,
+        ).create_deep_agent(subagents=subagents, streaming=streaming, callbacks=callbacks)
+
+    @staticmethod
     def _build_agent_from_config(name: str, cfg: BaseAgentConfig) -> Agent:
         """
         Create an ``Agent`` instance and attach the tools listed in the
@@ -97,7 +120,7 @@ class AgentFactory:
         elif name == "agent_generator":
             response_format = ToolStrategy(AgentGeneratorOutput)
         elif name == "qa":
-            response_format = ToolStrategy(AgentQAOutput)
+            response_format = ToolStrategy(TeamQAOutput)
 
         model_name = None
         if cfg.model_size == "small":

@@ -27,6 +27,7 @@ class AgentCreationTaskResult(BaseModel):
     passed_qa: bool = Field(default=False, description="QA review status")
     feedback: str = Field(default="", description="QA feedback if failed")
     retry_count: int = Field(default=0, description="Number of retries")
+    plan_run_id: str = Field(default="", description="Plan run identifier")
 
 
 class PlanTask(BaseModel):
@@ -37,6 +38,7 @@ class PlanTask(BaseModel):
     passed_qa: bool = Field(default=False, description="Whether the plan passed QA review")
     feedback: str = Field(default="", description="QA feedback if plan failed review")
     retry_count: int = Field(default=0, description="Number of times the plan has been retried")
+    run_id: str = Field(default="", description="Unique identifier for this plan run")
 
 
 class GraphState(BaseModel):
@@ -49,6 +51,8 @@ class GraphState(BaseModel):
 
     # Task results (all results including retries for tracking)
     task_results: Annotated[list[AgentCreationTaskResult], add] = Field(default_factory=list, description="All task results (for retry tracking)")
+
+    team_qa: dict[str, Any] | None = Field(default=None, description="Team-level QA output")
 
     final_output: str = Field(default="", description="Final formatted output")
 
@@ -95,3 +99,46 @@ class AgentQAOutput(BaseModel):
 
     overall_decision: Literal["approved", "needs_revision"]
     feedback: str | dict[str, Any] | list[Any]
+
+
+class TeamQAPlanIssue(BaseModel):
+    """Plan-level issues detected by team QA."""
+
+    issue_type: Literal[
+        "missing_agent",
+        "coverage_gap",
+        "role_overlap_requires_split",
+        "dependency_mismatch",
+        "workflow_gap",
+        "other",
+    ]
+    description: str
+    severity: Literal["low", "medium", "high", "critical"] = "medium"
+
+
+class TeamQAAgentIssue(BaseModel):
+    """Per-agent issue detected by team QA."""
+
+    issue: str
+    severity: Literal["low", "medium", "high", "critical"] = "medium"
+    suggestion: str | None = None
+
+
+class TeamQAAgentReview(BaseModel):
+    """Per-agent QA review summary."""
+
+    task_id: str
+    agent_id: str
+    agent_name: str
+    decision: Literal["approved", "needs_revision"]
+    issues: list[TeamQAAgentIssue] = Field(default_factory=list)
+    feedback: str | None = None
+
+
+class TeamQAOutput(BaseModel):
+    """Structured output for team-level QA."""
+
+    overall_decision: Literal["approved", "needs_revision"]
+    plan_level_issues: list[TeamQAPlanIssue] = Field(default_factory=list)
+    agent_reviews: list[TeamQAAgentReview] = Field(default_factory=list)
+    summary: str | None = None

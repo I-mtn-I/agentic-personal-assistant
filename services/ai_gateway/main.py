@@ -67,7 +67,7 @@ def main():
     repo = AgentConfigRepository.from_app_config(APP_CONFIG)
     crew_spawner = CrewSpawner(repo)
 
-    team_id_raw = "6fdb0baf-9ecf-4bdc-ba3d-2990bc7effe1"
+    team_id_raw = "60f60c1a-70a5-4593-a70a-717129cdf0bf"
     team_id = uuid.UUID(team_id_raw) if team_id_raw else None
     stream_response = True
     spawned_agents = crew_spawner.spawn_team(team_id=team_id, stream_response=stream_response)
@@ -75,7 +75,7 @@ def main():
     manager_stream = spawned_agents.manager_stream
 
     user_prompt = "What was the last statement from Donald Trump in 2026 about Iran? indicate the source with date."
-    response = asyncio.run(manager_agent.ask(user_prompt))
+    response: str = asyncio.run(manager_agent.ask(user_prompt))
     if not (stream_response and manager_stream and not manager_stream.should_print_final()):
         print(response)
 

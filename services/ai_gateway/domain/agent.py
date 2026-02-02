@@ -1,15 +1,16 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+from deepagents import create_deep_agent
 from langchain.agents import create_agent as lc_agent
 from langchain.tools import BaseTool, tool
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_ollama import ChatOllama
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field
 
 from ai_gateway.config import APP_CONFIG
+from ai_gateway.utils.llm_provider import build_langchain_chat_model
 
 
 class Agent:
@@ -61,14 +62,17 @@ class Agent:
         self.streaming = False
         self.callbacks: Optional[list[Any]] = None
         self.agent: Optional[CompiledStateGraph[Any, None, Any, Any]] = None
+        self.is_deep_agent = False
 
     def create_agent(self, *, streaming: bool = False, callbacks: Optional[list[Any]] = None) -> "Agent":
         self.streaming = streaming
         self.callbacks = callbacks
-        _model = ChatOllama(
-            model=self.model_name or getattr(APP_CONFIG, "LLM_MODEL", ""),
-            base_url=getattr(APP_CONFIG, "LLM_HOST", None),
+        self.is_deep_agent = False
+        _model = build_langchain_chat_model(
+            APP_CONFIG,
+            model_name=self.model_name,
             callbacks=callbacks,
+            reasoning=True,
         )
 
         agent_kwargs: Dict[str, Any] = {
@@ -86,6 +90,34 @@ class Agent:
             agent_kwargs["response_format"] = self.response_format
         self.agent = lc_agent(**agent_kwargs)
 
+        return self
+
+    def create_deep_agent(
+        self,
+        *,
+        subagents: list[dict[str, Any]] | None = None,
+        streaming: bool = False,
+        callbacks: Optional[list[Any]] = None,
+    ) -> "Agent":
+        self.streaming = streaming
+        self.callbacks = callbacks
+        self.is_deep_agent = True
+        _model = build_langchain_chat_model(
+            APP_CONFIG,
+            model_name=self.model_name,
+            callbacks=callbacks,
+        )
+
+        agent_kwargs: Dict[str, Any] = {
+            "model": _model,
+            "name": self.name,
+            "tools": self.tools,
+            "subagents": subagents or [],
+            "system_prompt": self.prompt,
+        }
+        if self.response_format is not None:
+            agent_kwargs["response_format"] = self.response_format
+        self.agent = create_deep_agent(**agent_kwargs)
         return self
 
     def _build_runnable_config(self) -> RunnableConfig | None:
@@ -109,7 +141,10 @@ class Agent:
             raise RuntimeError("Agent not initialised - call ``create_agent()`` before ``invoke()``.")
 
         config = self._build_runnable_config()
-        response = await self.agent.ainvoke({"messages": self._build_messages(query)}, config=config)
+        response = await self.agent.ainvoke(
+            {"messages": self._build_messages(query)},
+            config=config,
+        )
         # ``response`` follows the LangGraph schema; the last message holds the answer.
         return response["messages"][-1].content
 
@@ -121,7 +156,10 @@ class Agent:
             raise RuntimeError("Agent not initialised - call ``create_agent()`` before ``invoke()``.")
 
         config = self._build_runnable_config()
-        response = await self.agent.ainvoke({"messages": self._build_messages(query)}, config=config)
+        response = await self.agent.ainvoke(
+            {"messages": self._build_messages(query)},
+            config=config,
+        )
         return response
 
     def get_agent_as_tool(self, description: str) -> BaseTool:

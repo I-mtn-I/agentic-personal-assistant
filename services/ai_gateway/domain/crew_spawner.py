@@ -46,14 +46,7 @@ class CrewSpawner:
         streaming_callbacks = manager_stream.callbacks if manager_stream else None
 
         manager_tools = [ToolFactory.get_tool_by_name(tool.name) for tool in manager_record.tools]
-        manager_agent = AgentFactory.build_agent(
-            manager_record.agent_name,
-            manager_record.system_prompt,
-            manager_tools,
-            streaming=stream_response,
-            callbacks=streaming_callbacks,
-        )
-
+        subagents: list[dict] = []
         for agent_config_id in team_record.agent_config_ids:
             if agent_config_id == team_record.manager_agent_id:
                 continue
@@ -62,21 +55,23 @@ class CrewSpawner:
                 raise ValueError(f"Sub-agent config not found: {agent_config_id}")
 
             sub_tools = [ToolFactory.get_tool_by_name(tool.name) for tool in sub_record.tools]
-            sub_stream = build_streaming_session(sub_record.agent_name, is_subagent=True) if stream_response else None
-            sub_callbacks = sub_stream.callbacks if sub_stream else None
-            sub_agent = AgentFactory.build_agent(
-                sub_record.agent_name,
-                sub_record.system_prompt,
-                sub_tools,
-                streaming=stream_response,
-                callbacks=sub_callbacks,
+            subagents.append(
+                {
+                    "name": sub_record.agent_id,
+                    "description": f"{sub_record.agent_name}: {sub_record.purpose}",
+                    "system_prompt": sub_record.system_prompt,
+                    "tools": sub_tools,
+                }
             )
-            manager_agent = manager_agent.extend_agent_with_subagent(
-                sub_agent,
-                f"Sub-agent for: {sub_record.purpose}",
-                streaming=stream_response,
-                callbacks=streaming_callbacks,
-            )
+
+        manager_agent = AgentFactory.build_deep_agent(
+            manager_record.agent_name,
+            manager_record.system_prompt,
+            manager_tools,
+            subagents=subagents,
+            streaming=stream_response,
+            callbacks=streaming_callbacks,
+        )
 
         return SpawnedCrewResult(
             team_record=team_record,

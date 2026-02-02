@@ -15,9 +15,10 @@ from typing import Any, Callable, Dict, Iterator, Literal, Optional
 import yaml
 from dotenv import load_dotenv
 from llama_index.core import Settings
-from llama_index.embeddings.ollama import OllamaEmbedding
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from ai_gateway.utils.llm_provider import build_llama_index_embed_model, normalize_provider
 
 # --------------------------------------------------------------------------- #
 # Paths (allow override via environment variables)
@@ -43,18 +44,34 @@ class AppConfig(BaseSettings):
     POSTGRES_PASSWORD: str
     QDRANT_HOST: str
     QDRANT_PORT: str
-    LLM_HOST: str
+    LLM_PROVIDER: str = "local"
+    LLM_HOST: str | None = None
     LLM_MODEL: str
     LLM_MODEL_SMALL: str | None = None
     LLM_MODEL_MEDIUM: str | None = None
     LLM_MODEL_LARGE: str | None = None
     LLM_EMBED_MODEL: str
+    LLM_API_KEY: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_PATH),
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @field_validator("LLM_PROVIDER")
+    @classmethod
+    def _normalize_provider(cls, value: str) -> str:
+        return normalize_provider(value)
+
+    @model_validator(mode="after")
+    def _validate_llm_settings(self) -> "AppConfig":
+        provider = self.LLM_PROVIDER
+        if provider == "local" and not self.LLM_HOST:
+            raise ValueError("LLM_HOST is required when LLM_PROVIDER is 'local'")
+        if provider != "local" and not self.LLM_API_KEY:
+            raise ValueError("LLM_API_KEY is required when LLM_PROVIDER is not 'local'")
+        return self
 
 
 # --------------------------------------------------------------------------- #
@@ -263,10 +280,7 @@ def _safe_load_tools() -> Dict[str, BaseToolConfig]:
 
 
 def _init_llama_embeddings(config: AppConfig) -> None:
-    Settings.embed_model = OllamaEmbedding(
-        model_name=config.LLM_EMBED_MODEL,
-        base_url=config.LLM_HOST,
-    )
+    Settings.embed_model = build_llama_index_embed_model(config)
 
 
 def _load_env(load_dotenv_file: bool = True) -> AppConfig:

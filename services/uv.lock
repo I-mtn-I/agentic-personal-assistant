@@ -757,6 +757,15 @@ http2 = [
 ]
 
 [[package]]
+name = "httpx-sse"
+version = "0.4.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0f/4c/751061ffa58615a32c31b2d82e8482be8dd4a89154f003147acee90f2be9/httpx_sse-0.4.3.tar.gz", hash = "sha256:9b1ed0127459a66014aec3c56bebd93da3c1bc8bb6618c8082039a44889a755d", size = 15943, upload-time = "2025-10-10T21:48:22.271Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d2/fd/6668e5aec43ab844de6fc74927e155a3b37bf40d7c3790e49fc0406b6578/httpx_sse-0.4.3-py3-none-any.whl", hash = "sha256:0ac1c9fe3c0afad2e0ebb25a934a59f4c7823b60792691f779fad2c5568830fc", size = 8960, upload-time = "2025-10-10T21:48:21.158Z" },
+]
+
+[[package]]
 name = "huggingface-hub"
 version = "0.36.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1077,6 +1086,22 @@ wheels = [
 ]
 
 [[package]]
+name = "langchain-mistralai"
+version = "1.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "httpx-sse" },
+    { name = "langchain-core" },
+    { name = "pydantic" },
+    { name = "tokenizers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a8/07/cdfcfed8dc680634ae470868aecb9ac48f953302b13c0bb119f6ee96e1be/langchain_mistralai-1.1.1.tar.gz", hash = "sha256:2430dd6c5e714252ce58bdf9453da4e1f2c694e239dde7e9c4d488a6d1ef2368", size = 143032, upload-time = "2025-12-12T22:11:54.594Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2f/96/67e029665e9c348a2f17d1a681dc139631a6d8241b7a8d8e6ee69ff70a4b/langchain_mistralai-1.1.1-py3-none-any.whl", hash = "sha256:47839fc69c879bad4ff60133f238c15574416c2dcd850121621a7e9de45800c1", size = 19439, upload-time = "2025-12-12T22:11:53.546Z" },
+]
+
+[[package]]
 name = "langchain-ollama"
 version = "1.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1087,6 +1112,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/73/51/72cd04d74278f3575f921084f34280e2f837211dc008c9671c268c578afe/langchain_ollama-1.0.1.tar.gz", hash = "sha256:e37880c2f41cdb0895e863b1cfd0c2c840a117868b3f32e44fef42569e367443", size = 153850, upload-time = "2025-12-12T21:48:28.68Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e3/46/f2907da16dc5a5a6c679f83b7de21176178afad8d2ca635a581429580ef6/langchain_ollama-1.0.1-py3-none-any.whl", hash = "sha256:37eb939a4718a0255fe31e19fbb0def044746c717b01b97d397606ebc3e9b440", size = 29207, upload-time = "2025-12-12T21:48:27.832Z" },
+]
+
+[[package]]
+name = "langchain-openai"
+version = "1.1.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "langchain-core" },
+    { name = "openai" },
+    { name = "tiktoken" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/38/b7/30bfc4d1b658a9ee524bcce3b0b2ec9c45a11c853a13c4f0c9da9882784b/langchain_openai-1.1.7.tar.gz", hash = "sha256:f5ec31961ed24777548b63a5fe313548bc6e0eb9730d6552b8c6418765254c81", size = 1039134, upload-time = "2026-01-07T19:44:59.728Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/64/a1/50e7596aca775d8c3883eceeaf47489fac26c57c1abe243c00174f715a8a/langchain_openai-1.1.7-py3-none-any.whl", hash = "sha256:34e9cd686aac1a120d6472804422792bf8080a2103b5d21ee450c9e42d053815", size = 84753, upload-time = "2026-01-07T19:44:58.629Z" },
 ]
 
 [[package]]
@@ -2098,7 +2137,9 @@ dependencies = [
     { name = "duckduckgo-search" },
     { name = "langchain" },
     { name = "langchain-classic" },
+    { name = "langchain-mistralai" },
     { name = "langchain-ollama" },
+    { name = "langchain-openai" },
     { name = "langchain-qdrant" },
     { name = "langgraph" },
     { name = "llama-index" },
@@ -2132,7 +2173,9 @@ requires-dist = [
     { name = "duckduckgo-search", specifier = ">=6.4.2" },
     { name = "langchain", specifier = ">=1.0.5" },
     { name = "langchain-classic", specifier = ">=1.0.0" },
+    { name = "langchain-mistralai", specifier = ">=1.1.1" },
     { name = "langchain-ollama", specifier = ">=1.0.0" },
+    { name = "langchain-openai", specifier = ">=0.4.0" },
     { name = "langchain-qdrant", specifier = ">=1.1.0" },
     { name = "langgraph", specifier = ">=1.0.3" },
     { name = "llama-index", specifier = ">=0.14.8" },

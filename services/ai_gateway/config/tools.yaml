@@ -32,9 +32,9 @@ generate_wifi_pass:
 
 current_datetime:
   target: get_current_datetime
-  description: Useful to get current date and time. Use  this tool for reaching recent information.
+  description: Useful to get current date and time. Use this tool together with other tools access recent information.
   tags: [time, search, research, web]
-  disallowed_tags: [manager, orchestration]
+  disallowed_tags: []
 
 list_available_tools:
   target: list_available_tools

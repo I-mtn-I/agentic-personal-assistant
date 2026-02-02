@@ -38,7 +38,12 @@ The service expects these environment variables (via `services/.env`):
 
 - `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
 - `QDRANT_HOST`, `QDRANT_PORT`
-- `LLM_HOST`, `LLM_MODEL`, `LLM_EMBED_MODEL`
+- `LLM_PROVIDER`, `LLM_HOST`, `LLM_MODEL`, `LLM_EMBED_MODEL`, `LLM_API_KEY`
+
+Notes:
+
+- `LLM_HOST` is required when `LLM_PROVIDER=local` (Ollama).
+- `LLM_API_KEY` is required when `LLM_PROVIDER` is `mistral` or `openai`.
 
 Optional overrides:
 

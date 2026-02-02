@@ -1,9 +1,11 @@
 import asyncio
 import random
+import sys
+import traceback
 import uuid
 
 from ai_gateway.config.settings import APP_CONFIG
-from ai_gateway.domain import AgentConfigRepository, AgentFactory, ToolFactory
+from ai_gateway.domain import AgentConfigRepository, CrewSpawner
 
 
 def generate_hilton_guest_password():
@@ -63,41 +65,25 @@ def main():
     # Option C: Use Scaffolding Technique to Spawn generated agents from DB
     # -----------------------------------------------------------------------------
     repo = AgentConfigRepository.from_app_config(APP_CONFIG)
+    crew_spawner = CrewSpawner(repo)
 
-    team_id_raw = "73b13f09-85f9-4a8b-b232-eed488e19084"
-    if team_id_raw:
-        team_record = repo.get_team_config(team_id=uuid.UUID(team_id_raw))
-    else:
-        team_record = repo.get_latest_team_config()
+    team_id_raw = "60f60c1a-70a5-4593-a70a-717129cdf0bf"
+    team_id = uuid.UUID(team_id_raw) if team_id_raw else None
+    stream_response = True
+    spawned_agents = crew_spawner.spawn_team(team_id=team_id, stream_response=stream_response)
+    manager_agent = spawned_agents.manager_agent
+    manager_stream = spawned_agents.manager_stream
 
-    if not team_record:
-        raise ValueError("No team configuration found in database.")
-
-    manager_record = repo.get_agent_config_by_id(agent_config_id=team_record.manager_agent_id)
-    if not manager_record:
-        raise ValueError("Manager agent config not found for the selected team.")
-
-    manager_tools = [ToolFactory.get_tool_by_name(tool.name) for tool in manager_record.tools]
-    manager_agent = AgentFactory.build_agent(manager_record.agent_name, manager_record.system_prompt, manager_tools)
-
-    for agent_config_id in team_record.agent_config_ids:
-        if agent_config_id == team_record.manager_agent_id:
-            continue
-        sub_record = repo.get_agent_config_by_id(agent_config_id=agent_config_id)
-        if not sub_record:
-            raise ValueError(f"Sub-agent config not found: {agent_config_id}")
-
-        sub_tools = [ToolFactory.get_tool_by_name(tool.name) for tool in sub_record.tools]
-        sub_agent = AgentFactory.build_agent(sub_record.agent_name, sub_record.system_prompt, sub_tools)
-        manager_agent = manager_agent.extend_agent_with_subagent(
-            sub_agent,
-            f"Sub-agent for: {sub_record.purpose}",
-        )
-
-    user_prompt = "What was the last statement from Donald Trump? indicate the source and date time."
-    response = asyncio.run(manager_agent.ask(user_prompt))
-    print(response)
+    user_prompt = "What was the last statement from Donald Trump in 2026 about Iran? indicate the source with date."
+    response: str = asyncio.run(manager_agent.ask(user_prompt))
+    if not (stream_response and manager_stream and not manager_stream.should_print_final()):
+        print(response)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        print("Unhandled exception in ai_gateway.main", file=sys.stderr)
+        traceback.print_exc()
+        raise

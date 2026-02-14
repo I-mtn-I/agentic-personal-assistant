@@ -74,7 +74,8 @@ def main():
     manager_agent = spawned_agents.manager_agent
     manager_stream = spawned_agents.manager_stream
 
-    user_prompt = "What was the last statement from Donald Trump in 2026 about Iran? indicate the source with date."
+    # user_prompt = "What was the last statement from Donald Trump in 2026 about Iran? indicate the source with date."
+    user_prompt = "How did the Turkish Tractor market performed in 2025 and who is the market leader?"
     response: str = asyncio.run(manager_agent.ask(user_prompt))
     if not (stream_response and manager_stream and not manager_stream.should_print_final()):
         print(response)

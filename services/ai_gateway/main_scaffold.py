@@ -23,7 +23,7 @@ async def run_agent_scaffolding(
 
 
 async def main() -> None:
-    """Main entry point."""
+    """Main entry point for the agent scaffolding graph."""
     logger.info("Initializing agents...")
     default_agents = AgentFactory.generate_default_agents()
 

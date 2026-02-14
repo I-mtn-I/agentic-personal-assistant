@@ -1,6 +1,6 @@
 # factory.py
 import importlib
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from langchain.agents.structured_output import ToolStrategy
 from langchain_core.tools import BaseTool
@@ -16,11 +16,12 @@ from ai_gateway.config.settings import (
 from ai_gateway.domain.agent import Agent
 from ai_gateway.domain.scaffolding_models import (
     AgentGeneratorOutput,
-    AgentQAOutput,
     PlannerOutput,
     PlanQAOutput,
+    TeamQAOutput,
 )
 from ai_gateway.domain.tool import create_tool_from_callable
+from ai_gateway.utils.streaming import build_streaming_session
 
 
 class ToolFactory:
@@ -63,11 +64,41 @@ class AgentFactory:
     """
 
     @staticmethod
-    def build_agent(name: str, prompt: str, tools: Optional[List[BaseTool]] = None):
+    def build_agent(
+        name: str,
+        prompt: str,
+        tools: Optional[List[BaseTool]] = None,
+        *,
+        streaming: bool = False,
+        callbacks: Optional[List] = None,
+    ):
         """
         Build basic agent with name, prompt and tools
         """
-        return Agent(name=name, prompt=prompt, tools=tools).create_agent()
+        return Agent(name=name, prompt=prompt, tools=tools).create_agent(streaming=streaming, callbacks=callbacks)
+
+    @staticmethod
+    def build_deep_agent(
+        name: str,
+        prompt: str,
+        tools: Optional[List[BaseTool]] = None,
+        *,
+        subagents: Optional[List[dict]] = None,
+        streaming: bool = False,
+        callbacks: Optional[List] = None,
+        response_format: Optional[Any] = None,
+        model_name: Optional[str] = None,
+    ):
+        """
+        Build deep agent with name, prompt, tools, and optional subagents.
+        """
+        return Agent(
+            name=name,
+            prompt=prompt,
+            tools=tools,
+            response_format=response_format,
+            model_name=model_name,
+        ).create_deep_agent(subagents=subagents, streaming=streaming, callbacks=callbacks)
 
     @staticmethod
     def _build_agent_from_config(name: str, cfg: BaseAgentConfig) -> Agent:
@@ -89,7 +120,7 @@ class AgentFactory:
         elif name == "agent_generator":
             response_format = ToolStrategy(AgentGeneratorOutput)
         elif name == "qa":
-            response_format = ToolStrategy(AgentQAOutput)
+            response_format = ToolStrategy(TeamQAOutput)
 
         model_name = None
         if cfg.model_size == "small":
@@ -98,6 +129,9 @@ class AgentFactory:
             model_name = APP_CONFIG.LLM_MODEL_MEDIUM or APP_CONFIG.LLM_MODEL
         elif cfg.model_size == "large":
             model_name = APP_CONFIG.LLM_MODEL_LARGE or APP_CONFIG.LLM_MODEL
+
+        stream_session = build_streaming_session(name, is_subagent=False) if cfg.streaming else None
+        callbacks = stream_session.callbacks if stream_session else None
 
         return Agent(
             name=name,
@@ -109,7 +143,7 @@ class AgentFactory:
             checkpointer=None,
             response_format=response_format,
             model_name=model_name,
-        ).create_agent()
+        ).create_agent(streaming=cfg.streaming, callbacks=callbacks)
 
     @staticmethod
     def generate_default_agents() -> AgentConfigNamespace:
